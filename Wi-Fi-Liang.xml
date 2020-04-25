@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+	<name>Liang</name>
+	<SSIDConfig>
+		<SSID>
+			<hex>4C69616E67</hex>
+			<name>Liang</name>
+		</SSID>
+	</SSIDConfig>
+	<connectionType>ESS</connectionType>
+	<connectionMode>auto</connectionMode>
+	<MSM>
+		<security>
+			<authEncryption>
+				<authentication>WPA2PSK</authentication>
+				<encryption>AES</encryption>
+				<useOneX>false</useOneX>
+			</authEncryption>
+			<sharedKey>
+				<keyType>passPhrase</keyType>
+				<protected>true</protected>
+				<keyMaterial>01000000D08C9DDF0115D1118C7A00C04FC297EB0100000016CAFDF37DD73141A80D1C04BBB154AC00000000020000000000106600000001000020000000E2F5FD3730DD08FDA1FF11AA460275C74BC15ED5F9945C3841B19E05B7255A30000000000E8000000002000020000000314669F36D91BA3F87378FB9E2D704D9031060E52118192116AB77AC49E3F1A2100000000A2A5E290D911D84C427450268064DA640000000A50DF1FEFB6F7F03A92874BFD464098E8127888A58D518CA4CD7CF663E8624C9A0A2AFCB4B72187D60E15FF212550ED6523AFD1D58BE28CAB35683173DAEAF0A</keyMaterial>
+			</sharedKey>
+		</security>
+	</MSM>
+	<MacRandomization xmlns="http://www.microsoft.com/networking/WLAN/profile/v3">
+		<enableRandomization>false</enableRandomization>
+	</MacRandomization>
+</WLANProfile>
