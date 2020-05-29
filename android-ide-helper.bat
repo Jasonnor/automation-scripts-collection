@@ -11,6 +11,14 @@ adb -s 127.0.0.1:62026 shell am force-stop com.xxscript.idehelper
 adb -s 127.0.0.1:62027 shell am force-stop com.xxscript.idehelper
 adb -s 127.0.0.1:62028 shell am force-stop com.xxscript.idehelper
 timeout /t 5
+adb -s 127.0.0.1:62026 shell svc wifi disable
+adb -s 127.0.0.1:62027 shell svc wifi disable
+adb -s 127.0.0.1:62028 shell svc wifi disable
+timeout /t 2
+adb -s 127.0.0.1:62026 shell svc wifi enable
+adb -s 127.0.0.1:62027 shell svc wifi enable
+adb -s 127.0.0.1:62028 shell svc wifi enable
+timeout /t 5
 adb -s 127.0.0.1:62026 shell am start -n com.xxscript.idehelper/.activity.MainActivity
 adb -s 127.0.0.1:62027 shell am start -n com.xxscript.idehelper/.activity.MainActivity
 adb -s 127.0.0.1:62028 shell am start -n com.xxscript.idehelper/.activity.MainActivity
