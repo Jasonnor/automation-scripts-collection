@@ -6,9 +6,19 @@ SysGet, Monitor2, MonitorWorkArea, 3
 Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
 WindowNameArray := ["Azur Lane", "BanG Dream!", "Fate/Grand Order", "Princess Connect", "Test"]
-for Index, WindowName in WindowNameArray {
+WidthFactorArray := [1.0, 1.0, 1.0, 0.77, 0.55]
+ExistWindows := []
+for _, WindowName in WindowNameArray {
 	if WinExist(WindowName) {
-		WinMove, %WindowName%,, Monitor2Left, Monitor2Top + Monitor2Height * (Index - 1) / 5, Monitor2Width * 0.55, Monitor2Height / 5
+		ExistWindows.Push(WindowName)
 	}
 }
-
+NumWindows := ExistWindows.Length()
+for Index, ExistWindow in ExistWindows {
+	if (NumWindows > 5) {
+		WidthFactor := 0.55
+	} else {
+		WidthFactor := WidthFactorArray[NumWindows]
+	}
+	WinMove, %ExistWindow%,, Monitor2Left, Monitor2Top + Monitor2Height * (Index - 1) / NumWindows, Monitor2Width * WidthFactor, Monitor2Height / NumWindows
+}
