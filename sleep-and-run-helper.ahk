@@ -5,4 +5,4 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 Sleep, 360000
 Run,%Comspec% /c %A_ScriptDir%\android-ide-helper.bat,,hide
 Sleep, 90000
-Run,%A_ScriptDir%\adjust-nox-window.ahk,,
+Run,%A_ScriptDir%\adjust-nox-window-1080x1920.ahk,,
