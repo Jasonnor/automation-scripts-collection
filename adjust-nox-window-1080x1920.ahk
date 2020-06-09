@@ -6,7 +6,7 @@ SysGet, Monitor2, MonitorWorkArea, 3
 Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
 WindowNameArray := ["Azur Lane", "BanG Dream!", "Fate/Grand Order", "Princess Connect", "Test"]
-WidthFactorArray := [1.0, 1.0, 1.0, 0.77, 0.55]
+WidthFactorArray := [1.0, 1.0, 1.0, 0.73, 0.55]
 ExistWindows := []
 for _, WindowName in WindowNameArray {
 	if WinExist(WindowName) {
