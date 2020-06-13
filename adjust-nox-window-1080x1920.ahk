@@ -10,7 +10,9 @@ WidthFactorArray := [1.0, 1.0, 1.0, 0.73, 0.55]
 ExistWindows := []
 for _, WindowName in WindowNameArray {
 	if WinExist(WindowName) {
-		ExistWindows.Push(WindowName)
+		WinGet MMX, MinMax, %WindowName%
+		if MMX > -1
+			ExistWindows.Push(WindowName)
 	}
 }
 NumWindows := ExistWindows.Length()
