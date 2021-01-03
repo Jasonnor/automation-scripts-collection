@@ -17,3 +17,5 @@ WinMove, BanG Dream!,, Monitor2Left, Monitor2Top + Monitor2Height / 2, Monitor2W
 ; Right Bottom
 WinWait, Azur Lane
 WinMove, Azur Lane,, Monitor2Left + Monitor2Width / 2, Monitor2Top + Monitor2Height / 2, Monitor2Width / 2, Monitor2Height / 2
+WinWait, MGCM
+WinMove, MGCM,, Monitor2Left, Monitor2Top, Monitor2Width / 2, Monitor2Height / 2
