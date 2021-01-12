@@ -26,6 +26,9 @@ H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62028 shell am start -n com.xxscript.idehelp
 H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell am start -n code.asaiq.azure.r/com.cyjh.elfin.activity.ElfinFreeActivity
 timeout /t 10
 
+:: Adjust nox windows
+.\adjust-nox-window-1080x1920.ahk
+ 
 :: Enable root in unroot device, retry 3 times
 for /l %%x in (1, 1, 3) do (
 	timeout /t 10
