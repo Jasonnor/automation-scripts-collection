@@ -19,9 +19,10 @@ H:\Nox\Nox\bin\adb.exe devices
 :: H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell svc wifi enable
 
 :: Start IDE helpers
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell am start -n com.xxscript.idehelper/.activity.MainActivity
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62027 shell am start -n com.xxscript.idehelper/.activity.MainActivity
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62028 shell am start -n com.xxscript.idehelper/.activity.MainActivity
+H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62001 shell am start -n com.xxscript.idehelper/.activity.f
+H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell am start -n com.xxscript.idehelper/.activity.f
+H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62027 shell am start -n com.xxscript.idehelper/.activity.f
+H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62028 shell am start -n com.xxscript.idehelper/.activity.f
 H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell am start -n code.asaiq.azure.r/com.cyjh.elfin.activity.ElfinFreeActivity
 timeout /t 10
 
