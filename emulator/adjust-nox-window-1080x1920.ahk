@@ -5,7 +5,7 @@ SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
 SysGet, Monitor2, MonitorWorkArea, 2
 Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
-WindowNameArray := ["Azur Lane", "BanG Dream!", "Fate/Grand Order", "Princess Connect", "MGCM"]
+WindowNameArray := ["Fate/Grand Order", "MGCM", "Princess Connect", "Azur Lane", "BanG Dream!"]
 WidthFactorArray := [0.98, 0.98, 0.98, 0.73, 0.55]
 WinMaxWidth := 1040
 WinMaxHeight := 615
@@ -30,7 +30,7 @@ for Index, ExistWindow in ExistWindows {
 		SetWidth := WinMaxWidth
 	if (SetHeight > WinMaxHeight)
 		SetHeight := WinMaxHeight
-	WinMove, %ExistWindow%,, Monitor2Left, Monitor2Top + Monitor2Height * (Index - 1) / NumWindows, SetWidth, SetHeight
+	WinMove, %ExistWindow%,, Monitor2Left, Monitor2Bottom - SetHeight * Index, SetWidth, SetHeight
 }
 
 CoordMode, Pixel, Screen
