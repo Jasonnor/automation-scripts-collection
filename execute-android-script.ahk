@@ -93,8 +93,7 @@ if WinExist(WindowName) {
 	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
 	Sleep, 1000
 	; Start game
-	PixelSearch, Px, Py, Monitor2Left, Monitor2Top, Monitor2Right, Monitor2Bottom, 0xEEB5C3, 0, RGB FAST
-	Click, %Px% %Py%
+	Click, -790 220
 	Sleep, 1000
 	; Run script
 	Send ^3
