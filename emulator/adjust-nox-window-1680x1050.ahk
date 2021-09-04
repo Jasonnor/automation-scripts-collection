@@ -32,19 +32,19 @@ if WinExist("Azur Lane") {
 	WinMove, Azur Lane,, Monitor2Left + Monitor2Width / 2, Monitor2Top + Monitor2Height / 2, Monitor2Width / 2, Monitor2Height / 2
 }
 
-CoordMode, Pixel, Screen
-CoordMode, Mouse, Screen
-MouseGetPos, MouseX, MouseY
-Loop, 10
-{
-	TargetLeft := Monitor2Top + ((A_Index - 1) * Monitor2Height / 10)
-	TargetBottom := Monitor2Top + (A_Index * Monitor2Height / 10)
-	; MsgBox, %Monitor2Left% %TargetLeft% %Monitor2Right% %TargetBottom%
-	ImageSearch, FoundX, FoundY, Monitor2Left, TargetLeft, Monitor2Right, TargetBottom, nox-icon.png
-	If ErrorLevel = 0
-		{
-		; MsgBox, FoundX:`t%FoundX%`nFoundY:`t%FoundY%
-		MouseClickDrag, Left, FoundX, FoundY, FoundX, FoundY + 1
-		}
-}
-MouseMove, MouseX, MouseY
+; CoordMode, Pixel, Screen
+; CoordMode, Mouse, Screen
+; MouseGetPos, MouseX, MouseY
+; Loop, 10
+; {
+; 	TargetLeft := Monitor2Top + ((A_Index - 1) * Monitor2Height / 10)
+; 	TargetBottom := Monitor2Top + (A_Index * Monitor2Height / 10)
+; 	; MsgBox, %Monitor2Left% %TargetLeft% %Monitor2Right% %TargetBottom%
+; 	ImageSearch, FoundX, FoundY, Monitor2Left, TargetLeft, Monitor2Right, TargetBottom, nox-icon.png
+; 	If ErrorLevel = 0
+; 		{
+; 		; MsgBox, FoundX:`t%FoundX%`nFoundY:`t%FoundY%
+; 		MouseClickDrag, Left, FoundX, FoundY, FoundX, FoundY + 1
+; 		}
+; }
+; MouseMove, MouseX, MouseY
