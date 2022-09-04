@@ -7,8 +7,8 @@ CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
 WinWait, Groove 音樂
 WinActivate
-WinMove,,, 200, 70, 1000, 900,,
+WinMove,,, 200, 70, 1030, 1200,,
 Sleep, 300
-Click, 350 240
+Click, 710 1200
 Sleep, 300
 WinMinimize

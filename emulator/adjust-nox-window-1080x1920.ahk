@@ -2,7 +2,7 @@
 ; #Warn  ; Enable warnings to assist with detecting common errors.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
-SysGet, Monitor2, MonitorWorkArea, 2
+SysGet, Monitor2, MonitorWorkArea, 1
 Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
 WindowNameArray := ["Fate/Grand Order", "MGCM", "Princess Connect", "Azur Lane", "BanG Dream!"]

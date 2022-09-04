@@ -2,7 +2,7 @@
 ; #Warn  ; Enable warnings to assist with detecting common errors.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
-SysGet, Monitor2, MonitorWorkArea, 2
+SysGet, Monitor2, MonitorWorkArea, 1
 CoordMode, Pixel, Screen
 CoordMode, Mouse, Screen
 CoordMode, ToolTip, Screen
@@ -32,10 +32,12 @@ if WinExist(WindowName) {
 	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
 	Sleep, 1000
 	; Close hint
-	Click, -500 350
+	Click, 3120 970
 	Sleep, 1000
 	; Start script
 	PixelSearch, Px, Py, Monitor2Left, Monitor2Top, Monitor2Right, Monitor2Bottom, 0x1E93FF, 0, RGB FAST
+	Px := Px + 3
+	Py := Py + 3
 	Click, %Px% %Py%
 	Sleep, 1000
 	Send {Home}
@@ -43,7 +45,7 @@ if WinExist(WindowName) {
 	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
 	Sleep, 1000
 	; Start game
-	Click, -790 280
+	Click, 2860 830
 	Sleep, 1000
 }
 WindowName := "MGCM"
@@ -52,17 +54,27 @@ if WinExist(WindowName) {
 	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
 	Sleep, 1000
 	; Close hint
-	Click, -500 350
+	Click, 3120 970
 	Sleep, 1000
 	; Start script
 	PixelSearch, Px, Py, Monitor2Left, Monitor2Top, Monitor2Right, Monitor2Bottom, 0x1E93FF, 0, RGB FAST
+	Px := Px + 3
+	Py := Py + 3
 	Click, %Px% %Py%
-	Sleep, 1000
-	Send {Home}
-	Sleep, 3000
+	Sleep, 2000
 	; Run script
+	Send ^3
+	Sleep, 500
+	Send ^3
+	Sleep, 500
+	Send ^3
+	Sleep, 500
+	Send ^3
+	Sleep, 500
 	Send ^2
-	Sleep, 1000
+	Sleep, 500
+	Send ^2
+	Sleep, 500
 }
 WindowName := "Princess Connect"
 if WinExist(WindowName) {
@@ -70,10 +82,12 @@ if WinExist(WindowName) {
 	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
 	Sleep, 1000
 	; Close hint
-	Click, -500 350
+	Click, 3120 970
 	Sleep, 1000
 	; Start script
 	PixelSearch, Px, Py, Monitor2Left, Monitor2Top, Monitor2Right, Monitor2Bottom, 0x1E93FF, 0, RGB FAST
+	Px := Px + 3
+	Py := Py + 3
 	Click, %Px% %Py%
 	Sleep, 2000
 	; Run script
@@ -93,11 +107,12 @@ if WinExist(WindowName) {
 	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
 	Sleep, 1000
 	; Start game
-	Click, -790 220
+	Click, 2860 830
 	Sleep, 1000
 	; Run script
 	Send ^3
 	Sleep, 1000
 }
 
+Sleep, 2000
 Run,%A_ScriptDir%\emulator\adjust-nox-window-1080x1920.ahk,,
