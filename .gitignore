@@ -4,3 +4,6 @@
 
 # MacOS
 .DS_Store
+
+# Windows
+desktop.ini
