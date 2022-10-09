@@ -8,7 +8,7 @@ WaitImageAndClick(ImagePath, X1, Y1, X2, Y2)
 {
 	Loop
 	{
-		ImageSearch, FoundX, FoundY, X1, Y1, X2, Y2, *50 %ImagePath%
+		ImageSearch, FoundX, FoundY, X1, Y1, X2, Y2, *80 %ImagePath%
 		Sleep, 500
 	}
 	Until, !ErrorLevel
@@ -18,7 +18,7 @@ WaitImageAndClick(ImagePath, X1, Y1, X2, Y2)
 
 CickImage(ImagePath, X1, Y1, X2, Y2)
 {
-	ImageSearch, FoundX, FoundY, X1, Y1, X2, Y2, *50 %ImagePath%
+	ImageSearch, FoundX, FoundY, X1, Y1, X2, Y2, *80 %ImagePath%
 	Sleep, 500
 	if (!ErrorLevel) {
 		MouseClickAndMoveBack(FoundX, FoundY)
@@ -28,7 +28,7 @@ CickImage(ImagePath, X1, Y1, X2, Y2)
 
 CheckImageExist(ImagePath, X1, Y1, X2, Y2)
 {
-	ImageSearch, FoundX, FoundY, X1, Y1, X2, Y2, *50 %ImagePath%
+	ImageSearch, FoundX, FoundY, X1, Y1, X2, Y2, *80 %ImagePath%
 	Sleep, 500
 	Return ErrorLevel == "0"
 }
