@@ -94,25 +94,9 @@ if WinExist(WindowName) {
 	Send ^2
 	Sleep, 1000
 }
-WindowName := "Azur Lane"
-if WinExist(WindowName) {
-	WinActivate
-	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
-	Sleep, 1000
-	; Start script from bottom to top
-	PixelSearch, Px, Py, Monitor2Left, Monitor2Bottom, Monitor2Right, Monitor2Top, 0x3C7AC5, 0, RGB FAST
-	Px := Px + 30
-	Click, %Px% %Py%
-	Sleep, 2000
-	WinMove, %WindowName%,, Monitor2Left, Monitor2Top, Monitor2Width, Monitor2Height
-	Sleep, 1000
-	; Start game
-	Click, 2860 830
-	Sleep, 1000
-	; Run script
-	Send ^3
-	Sleep, 1000
-}
 
 Sleep, 2000
 Run,%A_ScriptDir%\emulator\adjust-nox-window-1080x1920.ahk,,
+
+Sleep, 1000
+Run,%A_ScriptDir%\emulator\fgo-enter-game.ahk,,
