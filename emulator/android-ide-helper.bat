@@ -4,10 +4,11 @@ H:\Nox\Nox\bin\adb.exe start-server
 
 :: Nox Port
 :: First 62001, Second 62025, Third and so on 62026, 62027...
-:: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62001
+:: 0: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62001
+:: 1: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62025
 H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62026
 H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62027
-::H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62028
+:: 4: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62028
 H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62029
 H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62030
 H:\Nox\Nox\bin\adb.exe devices
@@ -24,7 +25,7 @@ H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62001 shell am start -n com.xxscript.idehelp
 H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell am start -n com.xxscript.idehelper/.activity.f
 H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62027 shell am start -n com.xxscript.idehelper/.activity.f
 H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62028 shell am start -n com.xxscript.idehelper/.activity.f
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell am start -n code.asaiq.azure.r/com.cyjh.elfin.activity.ElfinFreeActivity
+:: H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell am start -n code.asaiq.azure.r/com.cyjh.elfin.activity.ElfinFreeActivity
 H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62030 shell am start -n com.xxscript.idehelper/.activity.f
 timeout /t 10
 
