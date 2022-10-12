@@ -23,7 +23,7 @@ Monitor2Height := Monitor2Bottom - Monitor2Top
 ;Top to bottom from right to left
 ;PixelSearch,x,y,Monitor2Right,Monitor2Top,Monitor2Left,Monitor2Bottom,0xFF34D2,,RGB
 
-Run,%A_ScriptDir%\emulator\adjust-nox-window-1080x1920.ahk,,
+Run,%A_ScriptDir%\adjust-nox-window-1080x1920.ahk,,
 Sleep, 1000
 
 WindowName := "Fate/Grand Order"
@@ -96,7 +96,7 @@ if WinExist(WindowName) {
 }
 
 Sleep, 2000
-Run,%A_ScriptDir%\emulator\adjust-nox-window-1080x1920.ahk,,
+Run,%A_ScriptDir%\adjust-nox-window-1080x1920.ahk,,
 
 Sleep, 1000
-Run,%A_ScriptDir%\emulator\fgo-enter-game.ahk,,
+Run,%A_ScriptDir%\fgo-enter-game.ahk,,
