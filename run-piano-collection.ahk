@@ -15,11 +15,12 @@ WinActivate
 WinMove,,, 2561, 324, 1088, 1015
 Sleep, 100
 Click, 2587 455
-Sleep, 100
+Sleep, 500
 WinWait, ahk_exe Kindle.exe
 WinActivate
-WinMaximize
 Sleep, 100
+WinMaximize
+Sleep, 500
 WinWait, ahk_exe Analog Lab V.exe
 WinActivate
 WinMove,,, 2551, -117, 1088, 925
