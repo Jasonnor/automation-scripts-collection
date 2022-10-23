@@ -32,3 +32,20 @@ CheckImageExist(ImagePath, X1, Y1, X2, Y2)
 	Sleep, 500
 	Return ErrorLevel == "0"
 }
+
+UrlDownloadToVar(URL)
+{
+	ComObjError(false)
+	WebRequest := ComObjCreate("WinHttp.WinHttpRequest.5.1")
+	WebRequest.Open("GET", URL)
+	WebRequest.Send()
+	Return WebRequest.ResponseText
+}
+
+WaitUntilNetworkConnected()
+{
+	while !UrlDownloadToVar("https://www.google.com")
+	{
+		Sleep 1000
+	}
+}
