@@ -2,7 +2,7 @@
 // @name         Eyny View Count Sorter
 // @namespace    http://tampermonkey.net/
 // @version      0.1
-// @description  try to take over the world!
+// @description  Click to sort article by view count
 // @author       You
 // @match        *://*.eyny.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=eyny.com
@@ -27,16 +27,19 @@
     scriptDisplay.style.cursor = 'pointer'
     scriptDisplay.style.display = 'block'
     scriptDisplay.innerText = '🐳'
+    scriptBody.append(scriptDisplay)
     const scriptForm = document.createElement('div')
     scriptForm.id = 'script-form'
     scriptForm.style.display = 'none'
+    scriptBody.append(scriptForm)
     const scriptButton = document.createElement('button')
     scriptButton.onclick = runScript
     scriptButton.innerText = 'Sort'
     scriptForm.append(scriptButton)
-    scriptBody.append(scriptDisplay)
-    scriptBody.append(scriptForm)
     document.body.append(scriptBody)
+
+    const addCSS = s => (document.head.appendChild(document.createElement('style')).innerHTML = s)
+    addCSS('#script-form > * { margin: 5px; display: block; }')
 
     function toggleScriptMenuDisplay() {
         const targetElement = document.getElementById('script-form')

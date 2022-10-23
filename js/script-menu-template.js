@@ -35,6 +35,9 @@
     scriptBody.append(scriptForm)
     document.body.append(scriptBody)
 
+    const addCSS = s => (document.head.appendChild(document.createElement('style')).innerHTML = s)
+    addCSS('#script-form > * { margin: 5px }')
+
     function toggleScriptMenuDisplay() {
         const targetElement = document.getElementById('script-form')
         targetElement.style.display = targetElement.style.display === 'block' ? 'none' : 'block'
