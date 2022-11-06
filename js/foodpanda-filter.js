@@ -95,24 +95,36 @@
         const filteredFoodTypes = scriptTypeInputValue.split(',')
         intervalId = window.setInterval(function () {
             document.querySelectorAll('.vendor-list>li').forEach(function (vendor) {
-                if (vendor.querySelector('[data-testid=multi-tag__text]') === null) {
-                    vendor.remove();
-                    return;
+                if (vendor.querySelector('span.rating--label-secondary.cl-neutral-secondary') === null) {
+                    vendor.remove()
+                    return
                 }
                 const ratingCount = parseInt(vendor.querySelector('span.rating--label-secondary.cl-neutral-secondary').innerHTML.replace(/[-+()\s]/g, ''))
                 if (ratingCount < scriptRatingCountInputValue) {
-                    vendor.remove();
-                    return;
+                    vendor.remove()
+                    return
                 }
-                const vendorTag = vendor.querySelector('[data-testid=multi-tag__text]').textContent;
-                const categories = Array.apply(null, vendor.querySelectorAll('.categories.summary>li>span'));
-                const notContainFoodTypes = categories.every(span => !filteredFoodTypes.includes(span.textContent));
-                if (notContainFoodTypes && new RegExp(keepRules.join('|')).test(vendorTag)) {
-                    return;
+                const categories = Array.apply(null, vendor.querySelectorAll('.categories.summary>li>span'))
+                const containFilteredFoodTypes = categories.some(span => filteredFoodTypes.includes(span.textContent))
+                if (containFilteredFoodTypes) {
+                    vendor.remove()
+                    return
                 }
-                vendor.remove();
+                // Skip discount filter if input is empty
+                if (scriptInputValue === '') {
+                    return
+                }
+                if (vendor.querySelector('[data-testid=multi-tag__text]') === null) {
+                    vendor.remove()
+                    return
+                }
+                const vendorTag = vendor.querySelector('[data-testid=multi-tag__text]').textContent
+                if (!new RegExp(keepRules.join('|')).test(vendorTag)) {
+                    vendor.remove()
+                    return
+                }
             })
-        }, 1000);
+        }, 1000)
     }
 
     function stopScript() {
