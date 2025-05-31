@@ -1,6 +1,6 @@
-H:\Nox\Nox\bin\adb.exe kill-server
-H:\Nox\Nox\bin\adb.exe start-server
-H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62029
-H:\Nox\Nox\bin\adb.exe devices
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 forward tcp:12121 tcp:12121
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver | H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver
+adb kill-server
+adb start-server
+adb connect 127.0.0.1:16448
+adb devices
+adb -s 127.0.0.1:16448 forward tcp:12121 tcp:12121
+adb -s 127.0.0.1:16448 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver | adb -s 127.0.0.1:16448 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver

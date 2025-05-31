@@ -1,40 +1,35 @@
 :: Restart adb server
-H:\Nox\Nox\bin\adb.exe kill-server
-H:\Nox\Nox\bin\adb.exe start-server
+adb kill-server
+adb start-server
 
-:: Nox Port
+:: Nox
 :: First 62001, Second 62025, Third and so on 62026, 62027...
-:: 0: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62001
-:: 1: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62025
-H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62026
-H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62027
-:: 4: H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62028
-H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62029
-H:\Nox\Nox\bin\adb.exe connect 127.0.0.1:62030
-H:\Nox\Nox\bin\adb.exe devices
+:: adb connect 127.0.0.1:62001
+:: adb connect 127.0.0.1:62025
+
+:: Mumu
+:: 16416, 16448, 16480, ... (see adb icon in MuMu MultiPlayer)
+adb connect 127.0.0.1:16480
 
 :: Force stop IDE helper if needed
-:: H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell am force-stop com.xxscript.idehelper
+:: adb -s 127.0.0.1:62025 shell am force-stop com.xxscript.idehelper
 
 :: Restart wifi if needed
-:: H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell svc wifi disable
-:: H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell svc wifi enable
+:: adb -s 127.0.0.1:62025 shell svc wifi disable
+:: adb -s 127.0.0.1:62025 shell svc wifi enable
 
 :: Start IDE helpers
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62001 shell am start -n com.xxscript.idehelper/.activity.f
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell am start -n com.xxscript.idehelper/.activity.f
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62027 shell am start -n com.xxscript.idehelper/.activity.f
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62028 shell am start -n com.xxscript.idehelper/.activity.f
-:: H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62029 shell am start -n code.asaiq.azure.r/com.cyjh.elfin.activity.ElfinFreeActivity
-H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62030 shell am start -n com.xxscript.idehelper/.activity.f
-timeout /t 10
+adb -s 127.0.0.1:16480 shell am start -n com.xxscript.idehelper/.activity.f
+:: Start AutoXJs
+:: adb -s 127.0.0.1:62001 shell monkey -p org.autojs.autoxjs.v6 -c android.intent.category.LAUNCHER 1
+timeout /t 2
 
 :: Adjust nox windows
 .\adjust-nox-window-1080x1920.ahk
  
-:: Enable root in unroot device, retry 3 times
-for /l %%x in (1, 1, 3) do (
-	timeout /t 10
-	H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 forward tcp:12121 tcp:12121
-	H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver | H:\Nox\Nox\bin\adb.exe -s 127.0.0.1:62026 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver
-)
+:: Forward port to XX IDE Helper and enable root in unroot device, retry 3 times
+:: for /l %%x in (1, 1, 3) do (
+:: 	timeout /t 2
+:: 	adb -s 127.0.0.1:62025 forward tcp:12121 tcp:12121
+:: 	adb -s 127.0.0.1:62025 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver | adb -s 127.0.0.1:62025 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver
+:: )
