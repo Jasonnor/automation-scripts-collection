@@ -2,10 +2,10 @@
 ; #Warn  ; Enable warnings to assist with detecting common errors.
 SendMode Input  ; Recommended for new scripts due to its superior speed and reliability.
 SetWorkingDir %A_ScriptDir%  ; Ensures a consistent starting directory.
-SysGet, Monitor2, MonitorWorkArea, 1
+SysGet, Monitor2, MonitorWorkArea, 0
 Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
-WindowNameArray := ["Fate/Grand Order", "MGCM", "Princess Connect", "Azur Lane", "BanG Dream!"]
+WindowNameArray := ["Fate Grand Order", "Blue Archive", "MGCM", "Princess Connect", "Azur Lane", "BanG Dream!", "PTCGP"]
 if WinExist("Princess Connect") {
 	; Left Top
 	WinWait, Princess Connect,, 5
@@ -25,6 +25,11 @@ if WinExist("BanG Dream!") {
 	; Left Bottom
 	WinWait, BanG Dream!,, 5
 	WinMove, BanG Dream!,, Monitor2Left, Monitor2Top + Monitor2Height / 2, Monitor2Width / 2, Monitor2Height / 2
+}
+if WinExist("Blue Archive") {
+	; Left Bottom
+	WinWait, Blue Archive,, 5
+	WinMove, Blue Archive,, Monitor2Left, Monitor2Top + Monitor2Height / 2, Monitor2Width / 2, Monitor2Height / 2
 }
 if WinExist("Azur Lane") {
 	; Right Bottom
