@@ -1,0 +1,6 @@
+adb kill-server
+adb start-server
+adb connect 127.0.0.1:16480
+adb devices
+adb -s 127.0.0.1:16480 forward tcp:12121 tcp:12121
+adb -s 127.0.0.1:16480 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver | adb -s 127.0.0.1:16480 shell sh /data/data/com.xxscript.idehelper/tengine/noroot/shellserver
