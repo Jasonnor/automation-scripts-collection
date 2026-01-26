@@ -111,7 +111,10 @@
           vendor.remove();
           return;
         }
-        const categories = Array.apply(null, vendor.querySelectorAll('div.vendor-info-row > div:nth-child(3) > div'));
+        const categories = Array.apply(
+          null,
+          vendor.querySelectorAll('div.vendor-tile-new-info > div:nth-child(2) > div:nth-child(5) > div')
+        );
         const containFilteredFoodTypes = categories.some((span) => filteredFoodTypes.includes(span.textContent));
         if (containFilteredFoodTypes) {
           vendor.remove();
