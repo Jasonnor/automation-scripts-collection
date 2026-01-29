@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iHerb Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.0.1
 // @description  try to take over the world!
 // @author       Jasonnor
 // @match        *://*.iherb.com/*
@@ -126,7 +126,7 @@
         const nameEl = document.querySelector('#name');
         const name = nameEl ? nameEl.textContent.trim() : '';
         const url = window.location.href;
-        const priceText = document.querySelector('.price-per-unit')?.textContent || '';
+        const priceText = document.querySelector('.list-price-per-unit')?.textContent || document.querySelector('.price-per-unit')?.textContent ||'';
         const priceMatch = priceText.match(/[\d.,]+/);
         const unit_price = priceMatch ? priceMatch[0] : '';
         const unitEl = document.querySelector('div > table > tbody > tr:nth-child(2) > td');
@@ -142,6 +142,8 @@
         if (unit_price) {
             const exchangeRate = await getUSDToTWDRate();
             const twdPrice = (parseFloat(unit_price) * exchangeRate).toFixed(2);
+            console.info(`Exchange Rate: ${exchangeRate}`);
+            console.info(`Unit Price: ${unit_price}`);
             md = `\n- [${name}](${url})\n    - NT$ ${twdPrice} / ${unit}`;
         } else {
             md = `\n- [${name}](${url})\n    - Price not available / ${unit}`;
