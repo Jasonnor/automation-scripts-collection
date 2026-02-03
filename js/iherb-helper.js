@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         iHerb Helper
 // @namespace    http://tampermonkey.net/
-// @version      1.0.1
+// @version      1.1.0
 // @description  try to take over the world!
 // @author       Jasonnor
 // @match        *://*.iherb.com/*
@@ -10,40 +10,40 @@
 // ==/UserScript==
 
 (function () {
-    'use strict';
+  'use strict';
 
-    const scriptBody = document.createElement('div');
-    scriptBody.id = 'ih-helper';
-    document.body.append(scriptBody);
+  const scriptBody = document.createElement('div');
+  scriptBody.id = 'ih-helper';
+  document.body.append(scriptBody);
 
-    // Toggle button (the “🐳” bubble)
-    const scriptDisplay = document.createElement('div');
-    scriptDisplay.id = 'ih-display';
-    scriptDisplay.innerText = '🐳';
-    scriptDisplay.onclick = () => scriptBody.classList.toggle('active');
-    scriptBody.append(scriptDisplay);
+  // Toggle button (the “🐳” bubble)
+  const scriptDisplay = document.createElement('div');
+  scriptDisplay.id = 'ih-display';
+  scriptDisplay.innerText = '🐳';
+  scriptDisplay.onclick = () => scriptBody.classList.toggle('active');
+  scriptBody.append(scriptDisplay);
 
-    // Hidden form panel
-    const scriptForm = document.createElement('div');
-    scriptForm.id = 'ih-form';
-    scriptBody.append(scriptForm);
+  // Hidden form panel
+  const scriptForm = document.createElement('div');
+  scriptForm.id = 'ih-form';
+  scriptBody.append(scriptForm);
 
-    // Action button
-    const scriptButton = document.createElement('button');
-    scriptButton.id = 'ih-btn';
-    scriptButton.innerText = 'Copy Markdown';
-    scriptButton.onclick = () => {
-        scriptButton.disabled = true;
-        scriptButton.innerText = 'Running…';
-        runScript().finally(() => {
-            scriptButton.disabled = false;
-            scriptButton.innerText = 'Copy Markdown';
-        });
-    };
-    scriptForm.append(scriptButton);
+  // Action button
+  const scriptButton = document.createElement('button');
+  scriptButton.id = 'ih-btn';
+  scriptButton.innerText = 'Copy Markdown';
+  scriptButton.onclick = () => {
+    scriptButton.disabled = true;
+    scriptButton.innerText = 'Running…';
+    runScript().finally(() => {
+      scriptButton.disabled = false;
+      scriptButton.innerText = 'Copy Markdown';
+    });
+  };
+  scriptForm.append(scriptButton);
 
-    // Injected CSS
-    const css = `
+  // Injected CSS
+  const css = `
     /* Container */
     #ih-helper {
       position: fixed;
@@ -107,61 +107,108 @@
       background: #218838;
     }
   `;
-    const style = document.createElement('style');
-    style.textContent = css;
-    document.head.append(style);
+  const style = document.createElement('style');
+  style.textContent = css;
+  document.head.append(style);
 
-    async function getUSDToTWDRate() {
-        try {
-            const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
-            const data = await response.json();
-            return data.rates.TWD;
-        } catch (error) {
-            console.error('Error fetching exchange rate:', error);
-            return 30; // Fallback exchange rate if API fails
-        }
+  async function getUSDToTWDRate() {
+    try {
+      const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+      const data = await response.json();
+      return data.rates.TWD;
+    } catch (error) {
+      console.error('Error fetching exchange rate:', error);
+      return 30; // Fallback exchange rate if API fails
+    }
+  }
+
+  async function runScript() {
+    const nameEl = document.querySelector('#name');
+    const name = nameEl ? nameEl.textContent.trim() : '';
+    const url = window.location.href;
+    const priceText =
+      document.querySelector('.list-price-per-unit')?.textContent ||
+      document.querySelector('.price-per-unit')?.textContent ||
+      '';
+    const priceMatch = priceText.match(/[\d.,]+/);
+    const unit_price = priceMatch ? priceMatch[0] : '';
+    const unitEl = document.querySelector('div > table > tbody > tr:nth-child(2) > td');
+    let unit = '';
+    if (unitEl) {
+      const txt = unitEl.textContent.trim();
+      const idx = txt.indexOf('：');
+      unit = idx >= 0 ? txt.slice(idx + 1).trim() : txt;
     }
 
-    async function runScript() {
-        const nameEl = document.querySelector('#name');
-        const name = nameEl ? nameEl.textContent.trim() : '';
-        const url = window.location.href;
-        const priceText = document.querySelector('.list-price-per-unit')?.textContent || document.querySelector('.price-per-unit')?.textContent ||'';
-        const priceMatch = priceText.match(/[\d.,]+/);
-        const unit_price = priceMatch ? priceMatch[0] : '';
-        const unitEl = document.querySelector('div > table > tbody > tr:nth-child(2) > td');
-        let unit = '';
-        if (unitEl) {
-            const txt = unitEl.textContent.trim();
-            const idx = txt.indexOf('：');
-            unit = idx >= 0 ? txt.slice(idx + 1).trim() : txt;
-        }
+    // Get exchange rate and convert USD to TWD
+    let md = '';
+    if (unit_price) {
+      const exchangeRate = await getUSDToTWDRate();
+      const twdPrice = (parseFloat(unit_price) * exchangeRate).toFixed(2);
+      console.info(`Exchange Rate: ${exchangeRate}`);
+      console.info(`Unit Price: ${unit_price}`);
+      // Calculate price per unit
+      let ppuText = '';
+      try {
+        // Helper functions for parsing
+        const parseUnit = (unitStr) => {
+          const normalized = unitStr.toLowerCase();
+          const parenMatch = normalized.match(/(?:[\(（])([\d.]+)\s*([a-z\u4e00-\u9fa5\s]+)(?:[\)）])/);
+          if (parenMatch) return { val: parseFloat(parenMatch[1]), unit: parenMatch[2].trim() };
+          const match = normalized.match(/^(\d+(?:\.\d+)?)\s*([a-z\u4e00-\u9fa5\s]+)/);
+          if (match) return { val: parseFloat(match[1]), unit: match[2].trim() };
+          return null;
+        };
 
-        // Get exchange rate and convert USD to TWD
-        let md = '';
-        if (unit_price) {
-            const exchangeRate = await getUSDToTWDRate();
-            const twdPrice = (parseFloat(unit_price) * exchangeRate).toFixed(2);
-            console.info(`Exchange Rate: ${exchangeRate}`);
-            console.info(`Unit Price: ${unit_price}`);
-            md = `\n- [${name}](${url})\n    - NT$ ${twdPrice} / ${unit}`;
-        } else {
-            md = `\n- [${name}](${url})\n    - Price not available / ${unit}`;
-        }
+        const parsed = parseUnit(unit);
+        if (parsed) {
+          let { val, unit: u } = parsed;
+          const conversions = {
+            kg: { to: 'g', factor: 1000 },
+            lb: { to: 'g', factor: 453.592 },
+            lbs: { to: 'g', factor: 453.592 },
+            克: { to: 'g', factor: 1 },
+            g: { to: 'g', factor: 1 },
+            mg: { to: 'g', factor: 0.001 },
+            l: { to: 'ml', factor: 1000 },
+            liter: { to: 'ml', factor: 1000 },
+            ml: { to: 'ml', factor: 1 },
+            'fl oz': { to: 'ml', factor: 29.5735 },
+          };
 
-        // Copy to clipboard (with fallback)
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            navigator.clipboard.writeText(md)
-                .then(() => console.log('Copied to clipboard:\n' + md))
-                .catch(err => console.error('Clipboard write failed', err));
-        } else {
-            const ta = document.createElement('textarea');
-            ta.value = md;
-            document.body.appendChild(ta);
-            ta.select();
-            document.execCommand('copy');
-            ta.remove();
-            console.log('Copied to clipboard:\n' + md);
+          if (conversions[u]) {
+            val = val * conversions[u].factor;
+            u = conversions[u].to;
+          }
+
+          if (val > 0) {
+            const ppu = parseFloat(twdPrice) / val;
+            const ppuStr = ppu < 0.01 ? ppu.toPrecision(3) : ppu.toFixed(2);
+            ppuText = `\n    - NT$ ${ppuStr} / ${u}`;
+          }
         }
+      } catch (e) {
+        console.error('Error calculating price per unit', e);
+      }
+      md = `\n- [${name}](${url})\n    - NT$ ${twdPrice} / ${unit}${ppuText}`;
+    } else {
+      md = `\n- [${name}](${url})\n    - Price not available / ${unit}`;
     }
+
+    // Copy to clipboard (with fallback)
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard
+        .writeText(md)
+        .then(() => console.log('Copied to clipboard:\n' + md))
+        .catch((err) => console.error('Clipboard write failed', err));
+    } else {
+      const ta = document.createElement('textarea');
+      ta.value = md;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      console.log('Copied to clipboard:\n' + md);
+    }
+  }
 })();
