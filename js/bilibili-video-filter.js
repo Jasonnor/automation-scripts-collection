@@ -5,6 +5,7 @@
 // @description  Filter and sort Bilibili videos by danmu count and view count
 // @author       Jasonnor
 // @match        https://space.bilibili.com/*
+// @match        https://search.bilibili.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bilibili.com
 // @grant        none
 // ==/UserScript==
@@ -352,7 +353,8 @@
     }
 
     /* Hidden video card */
-    .upload-video-card.bili-hidden {
+    .upload-video-card.bili-hidden,
+    .video-list > div.bili-hidden {
       display: none !important;
     }
   `;
@@ -376,23 +378,37 @@
 
   // Get all video cards (the outer wrapper)
   function getVideoCards() {
-    return Array.from(document.querySelectorAll('.upload-video-card'));
+    const cards = Array.from(document.querySelectorAll('.upload-video-card'));
+    if (cards.length > 0) return cards;
+    return Array.from(document.querySelectorAll('.video-list > div'));
   }
 
   // Extract danmu count from a video card
   function getDanmuCount(card) {
     const danmuEl = card.querySelector('.bili-cover-card__stat .sic-BDC-danmu_square_line');
-    if (!danmuEl) return 0;
-    const spanEl = danmuEl.nextElementSibling;
-    return spanEl ? parseChineseNumber(spanEl.textContent) : 0;
+    if (danmuEl) {
+      const spanEl = danmuEl.nextElementSibling;
+      return spanEl ? parseChineseNumber(spanEl.textContent) : 0;
+    }
+    const items = card.querySelectorAll('.bili-video-card__stats--item');
+    if (items.length >= 2) {
+      return parseChineseNumber(items[1].textContent);
+    }
+    return 0;
   }
 
   // Extract view count from a video card
   function getViewCount(card) {
     const viewEl = card.querySelector('.bili-cover-card__stat .sic-BDC-playdata_square_line');
-    if (!viewEl) return 0;
-    const spanEl = viewEl.nextElementSibling;
-    return spanEl ? parseChineseNumber(spanEl.textContent) : 0;
+    if (viewEl) {
+      const spanEl = viewEl.nextElementSibling;
+      return spanEl ? parseChineseNumber(spanEl.textContent) : 0;
+    }
+    const items = card.querySelectorAll('.bili-video-card__stats--item');
+    if (items.length >= 1) {
+      return parseChineseNumber(items[0].textContent);
+    }
+    return 0;
   }
 
   // Filter by danmu count
