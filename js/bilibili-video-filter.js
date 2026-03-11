@@ -354,6 +354,7 @@
 
     /* Hidden video card */
     .upload-video-card.bili-hidden,
+    .list-video-item.bili-hidden,
     .video-list > div.bili-hidden {
       display: none !important;
     }
@@ -378,7 +379,9 @@
 
   // Get all video cards (the outer wrapper)
   function getVideoCards() {
-    const cards = Array.from(document.querySelectorAll('.upload-video-card'));
+    let cards = Array.from(document.querySelectorAll('.upload-video-card'));
+    if (cards.length > 0) return cards;
+    cards = Array.from(document.querySelectorAll('.list-video-item'));
     if (cards.length > 0) return cards;
     return Array.from(document.querySelectorAll('.video-list > div'));
   }
