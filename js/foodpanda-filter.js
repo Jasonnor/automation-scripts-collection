@@ -11,84 +11,165 @@
 
 (function () {
   'use strict';
-  const scriptBody = document.createElement('div');
-  scriptBody.id = 'script-body';
-  scriptBody.style.zIndex = '999999';
-  scriptBody.style.position = 'fixed';
-  scriptBody.style.top = '60px';
-  scriptBody.style.right = 0;
-  scriptBody.style.padding = '2px';
-  scriptBody.style.margin = '2px';
-  scriptBody.style.fontSize = '1em';
-  scriptBody.style.textAlign = 'right';
-
-  const scriptDisplay = document.createElement('div');
-  scriptDisplay.id = 'script-display';
-  scriptDisplay.onclick = toggleScriptMenuDisplay;
-  scriptDisplay.style.cursor = 'pointer';
-  scriptDisplay.style.display = 'block';
-  scriptDisplay.innerText = '🐳';
-  scriptBody.append(scriptDisplay);
-
-  const scriptForm = document.createElement('div');
-  scriptForm.id = 'script-form';
-  scriptForm.style.display = 'none';
-  scriptBody.append(scriptForm);
-
-  const scriptInputLabel = document.createElement('label');
-  scriptInputLabel.setAttribute('for', 'script-input');
-  scriptInputLabel.innerText = 'Discount Keywords (separated by commas)';
-  scriptForm.append(scriptInputLabel);
-  const scriptInput = document.createElement('input');
-  scriptInput.id = 'script-input';
-  scriptInput.type = 'text';
-  scriptInput.defaultValue = '';
-  scriptForm.append(scriptInput);
-
-  const scriptRatingCountInputLabel = document.createElement('label');
-  scriptRatingCountInputLabel.setAttribute('for', 'script-rating-count-input');
-  scriptRatingCountInputLabel.innerText = 'Minimum rating count';
-  scriptForm.append(scriptRatingCountInputLabel);
-  const scriptRatingCountInput = document.createElement('input');
-  scriptRatingCountInput.id = 'script-rating-count-input';
-  scriptRatingCountInput.type = 'text';
-  scriptRatingCountInput.defaultValue = '0';
-  scriptForm.append(scriptRatingCountInput);
-
-  const scriptTypeInputLabel = document.createElement('label');
-  scriptTypeInputLabel.setAttribute('for', 'script-type-input');
-  scriptTypeInputLabel.innerText = 'Filtered Food Types (separated by commas)';
-  scriptForm.append(scriptTypeInputLabel);
-  const scriptTypeInput = document.createElement('input');
-  scriptTypeInput.id = 'script-type-input';
-  scriptTypeInput.type = 'text';
-  scriptTypeInput.defaultValue = '飲料,甜點,咖啡';
-  scriptForm.append(scriptTypeInput);
-
-  const scriptButton = document.createElement('button');
-  scriptButton.onclick = runScript;
-  scriptButton.innerText = 'Run';
-  scriptForm.append(scriptButton);
-
-  const scriptStopButton = document.createElement('button');
-  scriptStopButton.onclick = stopScript;
-  scriptStopButton.innerText = 'Stop';
-  scriptForm.append(scriptStopButton);
-
-  const scriptSortButton = document.createElement('button');
-  scriptSortButton.onclick = sortScript;
-  scriptSortButton.innerText = 'Sort';
-  scriptForm.append(scriptSortButton);
-
-  document.body.append(scriptBody);
-
   const addCSS = (s) => (document.head.appendChild(document.createElement('style')).innerHTML = s);
-  addCSS('#script-form > * { margin: 5px; display: block; }');
 
-  function toggleScriptMenuDisplay() {
-    const targetElement = document.getElementById('script-form');
-    targetElement.style.display = targetElement.style.display === 'block' ? 'none' : 'block';
-  }
+  addCSS(`
+    #fp-filter-container {
+      position: fixed;
+      top: 80px;
+      right: 20px;
+      z-index: 999999;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    #fp-filter-toggle {
+      width: 48px;
+      height: 48px;
+      background: white;
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      user-select: none;
+      margin-left: auto;
+    }
+    #fp-filter-toggle:hover {
+      transform: scale(1.05);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+    #fp-filter-panel {
+      margin-top: 12px;
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(0,0,0,0.08);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+      width: 320px;
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+    }
+    #fp-filter-panel.show {
+      display: flex;
+      animation: fpFadeIn 0.3s ease;
+    }
+    @keyframes fpFadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .fp-filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      text-align: left;
+    }
+    .fp-filter-group label {
+      font-size: 13px;
+      font-weight: 600;
+      color: #333;
+    }
+    .fp-filter-group input {
+      padding: 10px 12px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      background: #fafafa;
+      box-sizing: border-box;
+      width: 100%;
+    }
+    .fp-filter-group input:focus {
+      border-color: #d70f64;
+      box-shadow: 0 0 0 3px rgba(215, 15, 100, 0.1);
+      background: white;
+    }
+    .fp-button-group {
+      display: flex;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .fp-button {
+      flex: 1;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .fp-button-primary {
+      background: #d70f64;
+      color: white;
+    }
+    .fp-button-primary:hover {
+      background: #e21b70;
+      transform: translateY(-1px);
+    }
+    .fp-button-danger {
+      background: #fff;
+      color: #e02b27;
+      border: 1px solid #ffcccc;
+    }
+    .fp-button-danger:hover {
+      background: #fff5f5;
+      border-color: #e02b27;
+    }
+    .fp-button-secondary {
+      background: #fff;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+    .fp-button-secondary:hover {
+      background: #f5f5f5;
+    }
+  `);
+
+  const container = document.createElement('div');
+  container.id = 'fp-filter-container';
+  container.innerHTML = `
+    <div id="fp-filter-toggle" title="Foodpanda Filter">🐳</div>
+    <div id="fp-filter-panel">
+      <div class="fp-filter-group">
+        <label for="script-input">Discount Keywords (separated by commas)</label>
+        <input id="script-input" type="text" value="" placeholder="e.g. 滿百折五十, 免運" />
+      </div>
+      <div class="fp-filter-group">
+        <label for="script-rating-count-input">Minimum rating count</label>
+        <input id="script-rating-count-input" type="number" value="0" />
+      </div>
+      <div class="fp-filter-group">
+        <label for="script-type-input">Filtered Food Types (separated by commas)</label>
+        <input id="script-type-input" type="text" value="飲料,甜點,咖啡" placeholder="e.g. 飲料,甜點,咖啡" />
+      </div>
+      <div class="fp-button-group">
+        <button id="fp-btn-run" class="fp-button fp-button-primary">▶ Run</button>
+        <button id="fp-btn-stop" class="fp-button fp-button-danger">⏹ Stop</button>
+      </div>
+      <div class="fp-button-group">
+        <button id="fp-btn-sort" class="fp-button fp-button-secondary">⇅ Sort by Rating</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(container);
+
+  document.getElementById('fp-filter-toggle').addEventListener('click', () => {
+    document.getElementById('fp-filter-panel').classList.toggle('show');
+  });
+
+  document.getElementById('fp-btn-run').addEventListener('click', runScript);
+  document.getElementById('fp-btn-stop').addEventListener('click', stopScript);
+  document.getElementById('fp-btn-sort').addEventListener('click', sortScript);
 
   let intervalId = null;
 
@@ -105,15 +186,13 @@
           return;
         }
         const ratingCount = parseInt(
-          vendor.querySelector('span.bds-c-rating__label-secondary').innerHTML.replace(/[-+()\s]/g, '')
+          vendor.querySelector('span.bds-c-rating__label-secondary').innerHTML.replace(/[-+()\s]/g, ''),
         );
         if (ratingCount < scriptRatingCountInputValue) {
           vendor.remove();
           return;
         }
-        const categories = Array.from(
-          vendor.querySelectorAll('.sanitized-row-text, .vendor-info-row-text')
-        );
+        const categories = Array.from(vendor.querySelectorAll('.sanitized-row-text, .vendor-info-row-text'));
         const containFilteredFoodTypes = categories.some((span) => filteredFoodTypes.includes(span.textContent));
         if (containFilteredFoodTypes) {
           vendor.remove();
