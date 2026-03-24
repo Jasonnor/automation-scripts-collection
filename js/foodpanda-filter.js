@@ -111,9 +111,8 @@
           vendor.remove();
           return;
         }
-        const categories = Array.apply(
-          null,
-          vendor.querySelectorAll('div.vendor-tile-new-info > div:nth-child(2) > div:nth-child(5) > div')
+        const categories = Array.from(
+          vendor.querySelectorAll('.sanitized-row-text, .vendor-info-row-text')
         );
         const containFilteredFoodTypes = categories.some((span) => filteredFoodTypes.includes(span.textContent));
         if (containFilteredFoodTypes) {
@@ -145,9 +144,12 @@
     let ulList = document.querySelector('ul.vendor-list-revamp');
     if (ulList !== null) {
       document.querySelectorAll('span.bds-c-rating__label-primary').forEach(function (e) {
-        const rating = parseFloat(e.textContent.split('/')[0]);
-        const productNode = e.parentNode.parentNode.parentNode.parentNode.parentNode;
-        productNode.setAttribute('rating', rating);
+        const ratingText = e.textContent.split('/')[0];
+        const rating = parseFloat(ratingText);
+        const productNode = e.closest('li');
+        if (productNode) {
+          productNode.setAttribute('rating', rating || 0);
+        }
       });
       let categoryItemsArray = Array.from(document.querySelectorAll('[rating]'));
       let sorted = categoryItemsArray.sort(sorter);
@@ -160,10 +162,12 @@
     } else {
       ulList = document.querySelector('ul.vendor-list');
       document.querySelectorAll('span.bds-c-rating__label-primary').forEach(function (e) {
-        const rating = parseFloat(e.textContent.split('/')[0]);
-        //const productNode = e.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode.parentNode;
-        const productNode = e.parentNode.parentNode.parentNode.parentNode.parentNode;
-        productNode.setAttribute('rating', rating);
+        const ratingText = e.textContent.split('/')[0];
+        const rating = parseFloat(ratingText);
+        const productNode = e.closest('li');
+        if (productNode) {
+          productNode.setAttribute('rating', rating || 0);
+        }
       });
       let categoryItemsArray = Array.from(document.querySelectorAll('[rating]'));
       let sorted = categoryItemsArray.sort(sorter);
