@@ -24,7 +24,7 @@
     SELECTORS: {
       KEBAB_ICON: 'project-action-button > button > mat-icon',
       DELETE_MENU_ITEM: 'button.mat-mdc-menu-item.project-button-hamburger-menu-action.delete-button',
-      CONFIRM_BUTTON: 'button.mdc-button.mat-mdc-button-base.mat-mdc-tooltip-trigger.submit.mat-mdc-button.mat-primary',
+      CONFIRM_BUTTON: 'button.mdc-button.mat-mdc-button-base.primary-button.mat-mdc-unelevated-button',
     },
     TIMEOUTS: {
       ELEMENT_WAIT: 8000,
