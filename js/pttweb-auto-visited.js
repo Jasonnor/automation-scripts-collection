@@ -15,10 +15,10 @@
 
   const queue = [];
   let isProcessing = false;
-  
+
   // Timings for background tab handling
-  const TAB_WAIT_MS = 1000;    // Wait time after opening the tab before closing it
-  const TAB_THROTTLE_MS = 500; // Delay before opening the next queued tab
+  const TAB_WAIT_MS = 600;     // Wait time after opening the tab before closing it
+  const TAB_THROTTLE_MS = 200; // Delay before opening the next queued tab
 
   async function processQueue() {
     if (isProcessing || queue.length === 0) return;
@@ -27,9 +27,9 @@
     while (queue.length > 0) {
       const url = queue.shift();
       try {
-        // Open the URL in background to trigger browser history recording.
+        // Open the URL in the background to trigger browser history recording.
         // insert: false prevents disrupting the user's immediate active tab order
-        const tab = GM_openInTab(url, { active: false, insert: false });
+        const tab = GM_openInTab(url, {active: false, insert: false});
 
         // Let the browser have enough time to request and register URL history
         await new Promise((resolve) => setTimeout(resolve, TAB_WAIT_MS));
@@ -67,11 +67,11 @@
         }
       }
     },
-    { threshold: 0 } // Trigger as soon as visibility drops to 0%
+    {threshold: 0} // Trigger as soon as visibility drops to 0%
   );
 
   function observeNewArticles() {
-    // Select unobserved post links
+    // Select unobserved post-links
     const posts = document.querySelectorAll('a.e7-article-default:not([data-pttweb-observed])');
     for (const post of posts) {
       post.dataset.pttwebObserved = '1';
@@ -86,12 +86,12 @@
 
   function start() {
     observeNewArticles();
-    mutationObserver.observe(document.body, { childList: true, subtree: true });
+    mutationObserver.observe(document.body, {childList: true, subtree: true});
   }
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {
     start();
   } else {
-    globalThis.addEventListener('DOMContentLoaded', start, { once: true });
+    globalThis.addEventListener('DOMContentLoaded', start, {once: true});
   }
 })();
