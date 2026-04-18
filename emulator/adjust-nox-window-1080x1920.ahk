@@ -5,7 +5,7 @@ SetWorkingDir %A_ScriptDir% ; Ensures a consistent starting directory.
 SysGet, Monitor2, MonitorWorkArea, 1
 Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
-WindowNameArray := ["Fate Grand Order", "Blue Archive", "MGCM", "Princess Connect", "Azur Lane", "BanG Dream!", "PTCGP"]
+WindowNameArray := ["Fate Grand Order", "Azur Lane"]
 ExistWindows := []
 for _, WindowName in WindowNameArray {
 	if WinExist(WindowName) {
