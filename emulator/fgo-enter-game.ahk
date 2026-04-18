@@ -11,7 +11,7 @@ Monitor2Width := Monitor2Right - Monitor2Left
 Monitor2Height := Monitor2Bottom - Monitor2Top
 
 WindowName := "Fate/Grand Order"
-if WinExist(WindowName) 
+if WinExist(WindowName)
 {
 	WinActivate
 	WinMove,,,2560, 1293, 788, 470
@@ -27,4 +27,6 @@ if WinExist(WindowName)
 		CickImage(A_ScriptDir "\assets\fgo-close-friend-point.jpg", 2720, 1640, 2760, 1690)
 	}
 	Until CheckImageExist(A_ScriptDir "\assets\fgo-slider.jpg", 3280, 1385, 3305, 1420)
+	Sleep, 1000
+	Run,%A_ScriptDir%\adjust-nox-window-1080x1920.ahk,,
 }
