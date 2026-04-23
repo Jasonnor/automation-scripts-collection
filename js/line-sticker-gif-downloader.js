@@ -5,10 +5,12 @@
 // @description  Download LINE stickers as animated GIF (or PNG for static) from LINE Store product pages
 // @author       You
 // @match        *://store.line.me/stickershop/product/*
+// @match        *://yabeline.tw/Stickers_Data.php?Number=*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=store.line.me
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getResourceText
 // @connect      stickershop.line-scdn.net
+// @connect      sdl-stickershop.line.naver.jp
 // @require      https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js
 // @require      https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js
 // @require      https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js
@@ -20,6 +22,8 @@
 
   const LINE_GREEN = "#00C300";
   const LINE_GREEN_DARK = "#00A000";
+
+  const IS_YABE = window.location.hostname.includes("yabeline.tw");
 
   // ─── CSS ────────────────────────────────────────────────────────
   const addCSS = (s) => {
@@ -153,7 +157,8 @@
     }
 
     /* ── Per-sticker download button ── */
-    li.mdCMN09Li {
+    li.mdCMN09Li,
+    li.stickerSub {
       position: relative !important;
     }
     .ls-dl-btn {
@@ -178,7 +183,8 @@
       transition: background 0.15s ease, transform 0.15s ease;
       box-shadow: 0 2px 7px rgba(0, 0, 0, 0.22);
     }
-    li.mdCMN09Li:hover .ls-dl-btn {
+    li.mdCMN09Li:hover .ls-dl-btn,
+    li.stickerSub:hover .ls-dl-btn {
       display: flex;
     }
     .ls-dl-btn:hover {
@@ -245,12 +251,29 @@
   }
 
   function getStickerItems() {
+    if (IS_YABE) {
+      return Array.from(document.querySelectorAll("li.stickerSub"));
+    }
     return Array.from(
       document.querySelectorAll("li.FnStickerPreviewItem[data-preview]")
     );
   }
 
   function parsePreview(li) {
+    if (IS_YABE) {
+      const img = li.querySelector("img");
+      if (!img) return null;
+      const staticUrl = img.getAttribute("src");
+      const animationUrl = img.getAttribute("data-anim");
+      const idMatch = staticUrl.match(/sticker\/(\d+)/);
+      const id = idMatch ? idMatch[1] : Math.random().toString(36).substr(2, 9);
+      return {
+        id,
+        type: animationUrl ? "animation" : "static",
+        animationUrl,
+        staticUrl,
+      };
+    }
     try {
       const raw = li.getAttribute("data-preview").replace(/&quot;/g, '"');
       return JSON.parse(raw);
@@ -480,12 +503,13 @@
 
   // ─── Wait for sticker list to render (SPA safety) ────────────────
   function waitForStickers(cb) {
-    if (document.querySelector("li.FnStickerPreviewItem")) {
+    const selector = IS_YABE ? "li.stickerSub" : "li.FnStickerPreviewItem";
+    if (document.querySelector(selector)) {
       cb();
       return;
     }
     const obs = new MutationObserver(() => {
-      if (document.querySelector("li.FnStickerPreviewItem")) {
+      if (document.querySelector(selector)) {
         obs.disconnect();
         cb();
       }
