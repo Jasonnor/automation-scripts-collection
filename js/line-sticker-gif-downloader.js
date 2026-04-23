@@ -1,20 +1,15 @@
 // ==UserScript==
-// @name         LINE Sticker GIF Downloader
+// @name         LINE Sticker Downloader
 // @namespace    http://tampermonkey.net/
-// @version      1.0
-// @description  Download LINE stickers as animated GIF (or PNG for static) from LINE Store product pages
+// @version      1.1
+// @description  Download original high-quality LINE stickers (APNG/PNG) from LINE Store and Yabe-LINE
 // @author       You
 // @match        *://store.line.me/stickershop/product/*
 // @match        *://yabeline.tw/Stickers_Data.php?Number=*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=store.line.me
 // @grant        GM_xmlhttpRequest
-// @grant        GM_getResourceText
 // @connect      stickershop.line-scdn.net
 // @connect      sdl-stickershop.line.naver.jp
-// @require      https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js
-// @require      https://cdn.jsdelivr.net/npm/upng-js@2.1.0/UPNG.js
-// @require      https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.js
-// @resource     GIFWORKER https://cdn.jsdelivr.net/npm/gif.js@0.2.0/dist/gif.worker.js
 // ==/UserScript==
 
 (function () {
@@ -282,92 +277,12 @@
     }
   }
 
-  // ─── GIF Worker blob URL (Tampermonkey resource → blob) ──────────
-  let _workerBlobUrl = null;
-
-  function getWorkerUrl() {
-    if (_workerBlobUrl) return _workerBlobUrl;
-    const text = GM_getResourceText("GIFWORKER");
-    const blob = new Blob([text], {type: "application/javascript"});
-    _workerBlobUrl = URL.createObjectURL(blob);
-    return _workerBlobUrl;
-  }
-
-  // ─── APNG → GIF conversion ───────────────────────────────────────
-  // GIF has no alpha channel — we use a chroma-key color (near-pure green,
-  // very unlikely in sticker art) as the transparency index, and composite
-  // semi-transparent pixels onto a white background.
-  const TRANSPARENT_KEY = 0x00fe01; // 0xRRGGBB used by gif.js
-  const KEY_R = 0, KEY_G = 254, KEY_B = 1;
-
-  async function apngToGifBlob(buffer) {
-    const img = UPNG.decode(buffer);
-    const frames = UPNG.toRGBA8(img);
-    const {width, height} = img;
-
-    if (!frames || frames.length === 0) throw new Error("No frames decoded");
-
-    return new Promise((resolve, reject) => {
-      const gif = new GIF({
-        workers: 2,
-        quality: 10,
-        workerScript: getWorkerUrl(),
-        width,
-        height,
-        repeat: 0,
-        transparent: TRANSPARENT_KEY,
-      });
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d");
-
-      frames.forEach((frameData, i) => {
-        const src = new Uint8ClampedArray(frameData);
-        const out = new Uint8ClampedArray(width * height * 4);
-
-        for (let px = 0; px < src.length; px += 4) {
-          const a = src[px + 3];
-          if (a < 10) {
-            // Fully/nearly transparent → chroma key (will be transparent in GIF)
-            out[px]     = KEY_R;
-            out[px + 1] = KEY_G;
-            out[px + 2] = KEY_B;
-            out[px + 3] = 255;
-          } else {
-            // Alpha-composite onto white background to preserve antialiasing
-            const af = a / 255;
-            out[px]     = Math.round(src[px]     * af + 255 * (1 - af));
-            out[px + 1] = Math.round(src[px + 1] * af + 255 * (1 - af));
-            out[px + 2] = Math.round(src[px + 2] * af + 255 * (1 - af));
-            out[px + 3] = 255;
-          }
-        }
-
-        ctx.putImageData(new ImageData(out, width, height), 0, 0);
-
-        const delay =
-          img.frames && img.frames[i] && img.frames[i].delay != null
-            ? img.frames[i].delay
-            : 100;
-
-        gif.addFrame(ctx, {copy: true, delay: Math.max(delay, 20)});
-      });
-
-      gif.on("finished", resolve);
-      gif.on("abort", () => reject(new Error("GIF encoding aborted")));
-      gif.render();
-    });
-  }
-
   // ─── Download a single sticker ───────────────────────────────────
   async function downloadSticker(preview, packName, btnEl) {
     const {id, type, animationUrl, staticUrl} = preview;
     const isAnimated = type === "animation" && animationUrl;
     const url = isAnimated ? animationUrl : staticUrl;
-    const ext = isAnimated ? "gif" : "png";
-    const filename = `${packName}_${id}.${ext}`;
+    const filename = `${packName}_${id}.png`;
 
     if (btnEl) {
       btnEl.classList.remove("ls-done", "ls-error");
@@ -377,12 +292,7 @@
 
     try {
       const buffer = await fetchArrayBuffer(url);
-      let blob;
-      if (isAnimated) {
-        blob = await apngToGifBlob(buffer);
-      } else {
-        blob = new Blob([buffer], {type: "image/png"});
-      }
+      const blob = new Blob([buffer], {type: "image/png"});
       downloadBlob(blob, filename);
 
       if (btnEl) {
@@ -409,7 +319,7 @@
 
       const btn = document.createElement("button");
       btn.className = "ls-dl-btn";
-      btn.title = "Download as GIF";
+      btn.title = "Download original quality";
       btn.textContent = "↓";
 
       btn.addEventListener("click", (e) => {
@@ -437,7 +347,7 @@
       <div id="ls-panel">
         <div>
           <div class="ls-title">📥 LINE Sticker Downloader</div>
-          <div class="ls-subtitle">${count} sticker${count !== 1 ? "s" : ""} found &mdash; animated stickers saved as GIF, static as PNG</div>
+          <div class="ls-subtitle">${count} sticker${count !== 1 ? "s" : ""} found &mdash; original high-quality APNG/PNG files</div>
         </div>
         <button class="ls-btn ls-btn-primary" id="ls-btn-all">⬇ Download All (${count})</button>
         <div class="ls-progress-wrap" id="ls-progress-wrap">
@@ -473,10 +383,9 @@
         const preview = parsePreview(allItems[i]);
         if (!preview) continue;
 
-        status.textContent = `Converting & downloading ${i + 1} / ${total}…`;
+        status.textContent = `Downloading ${i + 1} / ${total}…`;
         fill.style.width = `${Math.round(((i) / total) * 100)}%`;
 
-        // Also update the individual button state if present
         const individualBtn = allItems[i].querySelector(".ls-dl-btn");
 
         try {
@@ -486,9 +395,7 @@
         }
 
         fill.style.width = `${Math.round(((i + 1) / total) * 100)}%`;
-
-        // Small pause to prevent browser from blocking too many simultaneous downloads
-        await new Promise((r) => setTimeout(r, 400));
+        await new Promise((r) => setTimeout(r, 200));
       }
 
       const errMsg = errorCount > 0 ? ` (${errorCount} failed)` : "";
