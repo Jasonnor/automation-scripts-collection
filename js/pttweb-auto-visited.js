@@ -5,6 +5,7 @@
 // @description  Automatically background-open and close scrolled-past PTTWeb posts to native-mark them as visited.
 // @author       Jasonnor
 // @match        https://www.pttweb.cc/*
+// @exclude      https://www.pttweb.cc/bbs/*/search/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=pttweb.cc
 // @grant        GM_openInTab
 // @run-at       document-idle
