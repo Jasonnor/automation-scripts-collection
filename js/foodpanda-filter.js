@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         Foodpanda Filter
 // @namespace    http://tampermonkey.net/
-// @version      0.1
-// @description  try to take over the world!
-// @author       You
+// @version      1.0
+// @description  Filter vendors by rating and keywords, display unit price for products, and sort by unit price.
+// @author       Jasonnor
 // @match        *://www.foodpanda.com.tw/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=foodpanda.com.tw
 // @grant        none
@@ -133,6 +133,13 @@
     .fp-button-secondary:hover {
       background: #f5f5f5;
     }
+    .fp-unit-price {
+      font-size: 12px;
+      color: #d70f64;
+      font-weight: bold;
+      margin-top: 4px;
+      display: block;
+    }
   `);
 
   const container = document.createElement('div');
@@ -159,6 +166,10 @@
       <div class="fp-button-group">
         <button id="fp-btn-sort" class="fp-button fp-button-secondary">⇅ Sort by Rating</button>
       </div>
+      <div class="fp-button-group">
+        <button id="fp-btn-unit-price" class="fp-button fp-button-secondary">💰 Unit Price</button>
+        <button id="fp-btn-sort-unit-price" class="fp-button fp-button-secondary">⇅ Sort Unit Price</button>
+      </div>
     </div>
   `;
   document.body.appendChild(container);
@@ -170,6 +181,8 @@
   document.getElementById('fp-btn-run').addEventListener('click', runScript);
   document.getElementById('fp-btn-stop').addEventListener('click', stopScript);
   document.getElementById('fp-btn-sort').addEventListener('click', sortScript);
+  document.getElementById('fp-btn-unit-price').addEventListener('click', displayUnitPrice);
+  document.getElementById('fp-btn-sort-unit-price').addEventListener('click', sortByUnitPrice);
 
   let intervalId = null;
 
@@ -198,19 +211,19 @@
           vendor.remove();
           return;
         }
-        // Skip discount filter if input is empty
-        // if (scriptInputValue === '') {
-        //   return;
-        // }
-        // if (vendor.querySelector('[data-testid=multi-tag__text]') === null) {
-        //   vendor.remove();
-        //   return;
-        // }
-        // const vendorTag = vendor.querySelector('[data-testid=multi-tag__text]').textContent;
-        // if (!new RegExp(keepRules.join('|')).test(vendorTag)) {
-        //   vendor.remove();
-        //   return;
-        // }
+        // Skip discount filter if needed
+        /*
+        if (scriptInputValue === '') return;
+        if (vendor.querySelector('[data-testid=multi-tag__text]') === null) {
+          vendor.remove();
+          return;
+        }
+        const vendorTag = vendor.querySelector('[data-testid=multi-tag__text]').textContent;
+        if (!new RegExp(keepRules.join('|')).test(vendorTag)) {
+          vendor.remove();
+          return;
+        }
+        */
       });
     }, 1000);
   }
@@ -257,5 +270,100 @@
       }
       sorted.forEach((e) => ulList.appendChild(e));
     }
+  }
+
+  function parseUnit(name) {
+    const multRegex = /(\d+)\s*(?:入|pcs?|個|支)?\s*[x*]\s*(\d+(?:\.\d+)?)\s*(g|克|kg|公斤|ml|毫升|l|升|L)/i;
+    const multMatch = name.match(multRegex);
+
+    let val, unit;
+
+    if (multMatch) {
+      val = parseFloat(multMatch[1]) * parseFloat(multMatch[2]);
+      unit = multMatch[3].toLowerCase();
+    } else {
+      const unitRegex = /(\d+(?:\.\d+)?)\s*(g|克|kg|公斤|ml|毫升|l|升|L|入|pc|pcs|片|袋|包|支|個|個裝)/i;
+      const match = name.match(unitRegex);
+      if (!match) return null;
+      val = parseFloat(match[1]);
+      unit = match[2].toLowerCase();
+    }
+
+    // Normalize to base units
+    if (['kg', '公斤', 'l', '升', 'l'].includes(unit)) {
+      val *= 1000;
+      unit = (unit === 'l' || unit === '升' || unit === 'l') ? 'ml' : 'g';
+    } else if (['g', '克'].includes(unit)) {
+      unit = 'g';
+    } else if (['ml', '毫升'].includes(unit)) {
+      unit = 'ml';
+    } else {
+      unit = 'unit';
+    }
+    return { val, unit };
+  }
+
+  function displayUnitPrice() {
+    const selectors = [
+      '[data-testid="product-card"]',
+      '[data-testid="inventory-item"]',
+      '.product-card-container',
+      'li[data-product-id]',
+      'article[data-testid="inventory-item"]',
+      '.groceries-product-card',
+      '[data-testid*="groceries-product-card-"]',
+    ];
+
+    const products = document.querySelectorAll(selectors.join(','));
+    products.forEach((p) => {
+      const nameNode = p.querySelector(
+        '[data-testid*="product-card-name"], .product-card-name, h3, .name'
+      );
+      const priceNode = p.querySelector(
+        '[data-testid*="product-card-price"], .product-card-price, .price'
+      );
+
+      if (!nameNode || !priceNode) return;
+
+      const name = nameNode.textContent;
+      const price = parseFloat(priceNode.textContent.replace(/[^\d.]/g, ''));
+
+      const unitData = parseUnit(name);
+      if (unitData && price) {
+        const unitPrice = price / unitData.val;
+        p.setAttribute('data-unit-price', unitPrice);
+
+        const oldLabel = p.querySelector('.fp-unit-price');
+        if (oldLabel) oldLabel.remove();
+
+        const label = document.createElement('div');
+        label.className = 'fp-unit-price';
+        label.textContent = `💰 NT$ ${unitPrice.toFixed(2)} / ${unitData.unit}`;
+        nameNode.after(label);
+      }
+    });
+  }
+
+  function sortByUnitPrice() {
+    displayUnitPrice();
+
+    const productsWithPrice = Array.from(document.querySelectorAll('[data-unit-price]'));
+    if (productsWithPrice.length === 0) {
+      alert('No unit prices found to sort by. Make sure units (g, ml, etc.) are in product names.');
+      return;
+    }
+
+    const itemsToSort = productsWithPrice.map((p) => p.closest('li') || p);
+    const container = itemsToSort[0].parentElement;
+
+    const sorted = itemsToSort.sort((a, b) => {
+      const getVal = (el) => {
+        const unitPriceEl = el.hasAttribute('data-unit-price') ? el : el.querySelector('[data-unit-price]');
+        return parseFloat(unitPriceEl?.getAttribute('data-unit-price') || 999999);
+      };
+      return getVal(a) - getVal(b);
+    });
+
+    sorted.forEach((item) => container.appendChild(item));
   }
 })();
