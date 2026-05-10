@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Foodpanda Filter
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1.0
 // @description  Filter vendors by rating and keywords, display unit price for products, and sort by unit price.
 // @author       Jasonnor
 // @match        *://www.foodpanda.com.tw/*
@@ -233,43 +233,46 @@
   }
 
   function sortScript() {
-    let ulList = document.querySelector('ul.vendor-list-revamp');
-    if (ulList !== null) {
-      document.querySelectorAll('span.bds-c-rating__label-primary').forEach(function (e) {
-        const ratingText = e.textContent.split('/')[0];
-        const rating = parseFloat(ratingText);
-        const productNode = e.closest('li');
-        if (productNode) {
-          productNode.setAttribute('rating', rating || 0);
-        }
-      });
-      let categoryItemsArray = Array.from(document.querySelectorAll('[rating]'));
-      let sorted = categoryItemsArray.sort(sorter);
-      function sorter(a, b) {
-        if (parseFloat(a.getAttribute('rating')) < parseFloat(b.getAttribute('rating'))) return 1;
-        if (parseFloat(a.getAttribute('rating')) > parseFloat(b.getAttribute('rating'))) return -1;
-        return 0;
+    const ulList = document.querySelector('ul.vendor-list-revamp') || document.querySelector('ul.vendor-list');
+    if (!ulList) return;
+
+    // Assign ratings to items within this list
+    ulList.querySelectorAll('li').forEach((li) => {
+      const ratingLabel = li.querySelector('span.bds-c-rating__label-primary');
+      if (ratingLabel) {
+        const ratingText = ratingLabel.textContent.split('/')[0];
+        li.setAttribute('rating', parseFloat(ratingText) || 0);
       }
-      sorted.forEach((e) => ulList.appendChild(e));
-    } else {
-      ulList = document.querySelector('ul.vendor-list');
-      document.querySelectorAll('span.bds-c-rating__label-primary').forEach(function (e) {
-        const ratingText = e.textContent.split('/')[0];
-        const rating = parseFloat(ratingText);
-        const productNode = e.closest('li');
-        if (productNode) {
-          productNode.setAttribute('rating', rating || 0);
+    });
+
+    // De-duplicate items by store link
+    const itemsArray = Array.from(ulList.children).filter((el) => el.hasAttribute('rating'));
+    const seenHrefs = new Set();
+    const uniqueItems = [];
+
+    itemsArray.forEach((item) => {
+      const link = item.querySelector('a')?.getAttribute('href');
+      if (link) {
+        if (seenHrefs.has(link)) {
+          item.remove(); // Remove duplicate from DOM
+        } else {
+          seenHrefs.add(link);
+          uniqueItems.push(item);
         }
-      });
-      let categoryItemsArray = Array.from(document.querySelectorAll('[rating]'));
-      let sorted = categoryItemsArray.sort(sorter);
-      function sorter(a, b) {
-        if (parseFloat(a.getAttribute('rating')) < parseFloat(b.getAttribute('rating'))) return 1;
-        if (parseFloat(a.getAttribute('rating')) > parseFloat(b.getAttribute('rating'))) return -1;
-        return 0;
+      } else {
+        uniqueItems.push(item);
       }
-      sorted.forEach((e) => ulList.appendChild(e));
-    }
+    });
+
+    // Sort by rating descending
+    uniqueItems.sort((a, b) => {
+      const rA = parseFloat(a.getAttribute('rating')) || 0;
+      const rB = parseFloat(b.getAttribute('rating')) || 0;
+      return rB - rA;
+    });
+
+    // Re-append sorted items
+    uniqueItems.forEach((e) => ulList.appendChild(e));
   }
 
   function parseUnit(name) {
@@ -353,10 +356,29 @@
       return;
     }
 
-    const itemsToSort = productsWithPrice.map((p) => p.closest('li') || p);
+    // Ensure unique elements
+    const itemsToSort = Array.from(new Set(productsWithPrice.map((p) => p.closest('li') || p)));
     const container = itemsToSort[0].parentElement;
 
-    const sorted = itemsToSort.sort((a, b) => {
+    // De-duplicate products by name
+    const seenKeys = new Set();
+    const uniqueItems = [];
+    itemsToSort.forEach((item) => {
+      const name =
+        item.querySelector('[data-testid*="product-card-name"], .product-card-name, h3, .name')?.textContent || '';
+      const unitPrice =
+        item.getAttribute('data-unit-price') || item.querySelector('[data-unit-price]')?.getAttribute('data-unit-price');
+      const key = `${name}-${unitPrice}`;
+
+      if (seenKeys.has(key)) {
+        item.remove();
+      } else {
+        seenKeys.add(key);
+        uniqueItems.push(item);
+      }
+    });
+
+    const sorted = uniqueItems.sort((a, b) => {
       const getVal = (el) => {
         const unitPriceEl = el.hasAttribute('data-unit-price') ? el : el.querySelector('[data-unit-price]');
         return parseFloat(unitPriceEl?.getAttribute('data-unit-price') || 999999);
