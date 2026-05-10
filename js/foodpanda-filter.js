@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Foodpanda Filter
 // @namespace    http://tampermonkey.net/
-// @version      1.1.0
+// @version      1.1.1
 // @description  Filter vendors by rating and keywords, display unit price for products, and sort by unit price.
 // @author       Jasonnor
 // @match        *://www.foodpanda.com.tw/*
@@ -190,40 +190,40 @@
     const scriptInputValue = document.getElementById('script-input').value;
     const scriptTypeInputValue = document.getElementById('script-type-input').value;
     const scriptRatingCountInputValue = parseInt(document.getElementById('script-rating-count-input').value);
-    const keepRules = scriptInputValue.split(',');
-    const filteredFoodTypes = scriptTypeInputValue.split(',');
+    const filteredFoodTypes = scriptTypeInputValue.split(',').map(s => s.trim()).filter(s => s);
     intervalId = window.setInterval(function () {
-      document.querySelectorAll('.vendor-list-revamp>li').forEach(function (vendor) {
-        if (vendor.querySelector('span.bds-c-rating__label-secondary') === null) {
-          vendor.remove();
-          return;
+      document.querySelectorAll('.vendor-list-revamp>li, .vendor-list>li').forEach(function (vendor) {
+        if (vendor.hasAttribute('data-fp-filter-v2')) return;
+
+        const ratingCountEl = vendor.querySelector('.bds-c-rating__label-secondary, [data-testid="review-and-rating"], .bds-c-rating');
+        if (ratingCountEl) {
+          const ratingCountText = ratingCountEl.textContent.replace(/[-+()\s]/g, '').toLowerCase();
+          const match = ratingCountText.match(/\d+/);
+          if (match) {
+            let ratingCount = parseInt(match[0]);
+            if (ratingCountText.includes('k')) ratingCount *= 1000;
+            if (ratingCount < scriptRatingCountInputValue) {
+              vendor.remove();
+              return;
+            }
+          }
         }
-        const ratingCount = parseInt(
-          vendor.querySelector('span.bds-c-rating__label-secondary').innerHTML.replace(/[-+()\s]/g, ''),
-        );
-        if (ratingCount < scriptRatingCountInputValue) {
-          vendor.remove();
-          return;
-        }
-        const categories = Array.from(vendor.querySelectorAll('.sanitized-row-text, .vendor-info-row-text'));
-        const containFilteredFoodTypes = categories.some((span) => filteredFoodTypes.includes(span.textContent));
+
+        const categoryElements = Array.from(vendor.querySelectorAll('.sanitized-row-text, .vendor-info-row-text, .bds-c-vendor-tile__metadata-item, .bds-c-vendor-tile__info-row-text, [data-testid*="vendor-info-row-text"], [data-testid^="vendor-info-row-"], .sr-only'));
+        const containFilteredFoodTypes = categoryElements.some((el) => {
+          const text = el.textContent;
+          return filteredFoodTypes.some(type => text.includes(type));
+        });
+
         if (containFilteredFoodTypes) {
           vendor.remove();
           return;
         }
-        // Skip discount filter if needed
-        /*
-        if (scriptInputValue === '') return;
-        if (vendor.querySelector('[data-testid=multi-tag__text]') === null) {
-          vendor.remove();
-          return;
+
+        // Only mark as processed if we found some metadata to ensure it was fully loaded
+        if (categoryElements.length > 0) {
+          vendor.setAttribute('data-fp-filter-v2', 'true');
         }
-        const vendorTag = vendor.querySelector('[data-testid=multi-tag__text]').textContent;
-        if (!new RegExp(keepRules.join('|')).test(vendorTag)) {
-          vendor.remove();
-          return;
-        }
-        */
       });
     }, 1000);
   }
@@ -236,16 +236,15 @@
     const ulList = document.querySelector('ul.vendor-list-revamp') || document.querySelector('ul.vendor-list');
     if (!ulList) return;
 
-    // Assign ratings to items within this list
     ulList.querySelectorAll('li').forEach((li) => {
-      const ratingLabel = li.querySelector('span.bds-c-rating__label-primary');
+      const ratingLabel = li.querySelector('.bds-c-rating__label-primary, [data-testid="review-and-rating"], .bds-c-rating');
       if (ratingLabel) {
-        const ratingText = ratingLabel.textContent.split('/')[0];
-        li.setAttribute('rating', parseFloat(ratingText) || 0);
+        const ratingMatch = ratingLabel.textContent.match(/\d+\.\d+/);
+        const ratingValue = ratingMatch ? ratingMatch[0] : ratingLabel.textContent.split('/')[0];
+        li.setAttribute('rating', parseFloat(ratingValue) || 0);
       }
     });
 
-    // De-duplicate items by store link
     const itemsArray = Array.from(ulList.children).filter((el) => el.hasAttribute('rating'));
     const seenHrefs = new Set();
     const uniqueItems = [];
