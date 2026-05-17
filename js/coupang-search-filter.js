@@ -1,10 +1,11 @@
 // ==UserScript==
 // @name         Coupang Search Filter
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.0.0
 // @description  Filter and sort Coupang search results by unit price, reviews, and discounts
 // @author       You
 // @match        *://www.tw.coupang.com/search*
+// @match        *://www.tw.coupang.com/categories*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=tw.coupang.com
 // @grant        none
 // ==/UserScript==
