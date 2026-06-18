@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         PTTWeb Auto-Visited
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      1.1.0
 // @description  Automatically background-open and close scrolled-past PTTWeb posts to native-mark them as visited.
 // @author       Jasonnor
 // @match        https://www.pttweb.cc/*
@@ -15,40 +15,52 @@
   'use strict';
 
   const queue = [];
-  let isProcessing = false;
+  const processedUrls = new Set(); // Tracks queued or processed URLs in this session
+  let activeTabCount = 0;
+  let isThrottling = false; // Prevents launching tabs concurrently without throttle delay
 
   // Timings for background tab handling
+  const MAX_CONCURRENT_TABS = 3;
   const TAB_WAIT_MS = 600;     // Wait time after opening the tab before closing it
   const TAB_THROTTLE_MS = 200; // Delay before opening the next queued tab
 
   async function processQueue() {
-    if (isProcessing || queue.length === 0) return;
-    isProcessing = true;
+    if (activeTabCount >= MAX_CONCURRENT_TABS || queue.length === 0 || isThrottling) return;
 
-    while (queue.length > 0) {
-      const url = queue.shift();
-      try {
-        // Open the URL in the background to trigger browser history recording.
-        // insert: false prevents disrupting the user's immediate active tab order
-        const tab = GM_openInTab(url, {active: false, insert: false});
+    isThrottling = true;
+    const url = queue.shift();
 
-        // Let the browser have enough time to request and register URL history
-        await new Promise((resolve) => setTimeout(resolve, TAB_WAIT_MS));
+    // Start processing this tab asynchronously
+    openAndCloseTab(url);
 
-        if (tab && typeof tab.close === 'function') {
-          tab.close();
-        }
-      } catch (e) {
-        console.error('[PTTWeb Auto-Visited] Error handling tab:', e);
+    // Throttle before the next tab can be opened
+    await new Promise((resolve) => setTimeout(resolve, TAB_THROTTLE_MS));
+    isThrottling = false;
+
+    // Trigger processQueue again to process next items
+    processQueue();
+  }
+
+  async function openAndCloseTab(url) {
+    activeTabCount++;
+    try {
+      // Open the URL in the background to trigger browser history recording.
+      // insert: false prevents disrupting the user's immediate active tab order
+      const tab = GM_openInTab(url, {active: false, insert: false});
+
+      // Let the browser have enough time to request and register URL history
+      await new Promise((resolve) => setTimeout(resolve, TAB_WAIT_MS));
+
+      if (tab && typeof tab.close === 'function') {
+        tab.close();
       }
-
-      // Small throttling delay to avoid overwhelming the browser
-      if (queue.length > 0) {
-        await new Promise((resolve) => setTimeout(resolve, TAB_THROTTLE_MS));
-      }
+    } catch (e) {
+      console.error('[PTTWeb Auto-Visited] Error handling tab:', e);
+    } finally {
+      activeTabCount--;
+      // Process next item since a concurrency slot has opened
+      processQueue();
     }
-
-    isProcessing = false;
   }
 
   const observer = new IntersectionObserver(
@@ -62,8 +74,11 @@
           // If bounds are negative, it has left via the top of the viewport (user scrolled past it)
           if (bounding.top < 0 && !el.dataset.pttwebVisited) {
             el.dataset.pttwebVisited = 'true';
-            queue.push(el.href);
-            processQueue();
+            if (!processedUrls.has(el.href)) {
+              processedUrls.add(el.href);
+              queue.push(el.href);
+              processQueue();
+            }
           }
         }
       }
