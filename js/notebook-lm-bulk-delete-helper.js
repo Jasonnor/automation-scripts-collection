@@ -1,16 +1,16 @@
 // ==UserScript==
-// @name         NotebookLM bulk-delete helper
+// @name         Gemini Notebook bulk-delete helper
 // @namespace    http://tampermonkey.net/
-// @version      2026-01-27
+// @version      2026-07-28
 // @author       Jasonnor
-// @description  Adds a floating button that deletes every note in the current NotebookLM view (by clicking the UI just as a human would). USE WITH CARE!
-// @match        https://notebooklm.google.com/*
-// @icon         https://www.google.com/s2/favicons?sz=64&domain=notebooklm.google.com
+// @description  Adds a floating button that deletes every note in the current Gemini Notebook view (by clicking the UI just as a human would). USE WITH CARE!
+// @match        https://notebook.google.com/*
+// @icon         https://www.google.com/s2/favicons?sz=64&domain=notebook.google.com
 // @grant        none
 // ==/UserScript==
 
 /*  ***************************************************************
- *  NotebookLM bulk-delete helper
+ *  Gemini Notebook bulk-delete helper
  *  --------------------------------------------------------------
  *  1. Floats a "Bulk Delete" button in the bottom-left.
  *  2. Uses a Material Design accessible SVG icon.
@@ -35,7 +35,7 @@
       BUTTON_ID: 'nb-lm-bulk-delete-btn',
       MSG_CONFIRM:
         'Delete ALL notes visible in this notebook?\n\nThis simply clicks the regular UI in a loop, but it cannot be undone.',
-      MSG_STARTING: '[NotebookLM bulk-delete] Starting ...',
+      MSG_STARTING: '[Gemini Notebook bulk-delete] Starting ...',
       MSG_FINISHED: (count) => `✅ Deleted ${count} note${count !== 1 ? 's' : ''}.`,
       MSG_ABORTED: (msg) => `❌ Bulk delete aborted: ${msg}`,
     },
@@ -108,11 +108,11 @@
         labelSpan.innerText = `Deleting... (${counter})`;
       }
       const finishMsg = CONFIG.UI.MSG_FINISHED(counter);
-      console.log(`[NotebookLM bulk-delete] ${finishMsg}`);
+      console.log(`[Gemini Notebook bulk-delete] ${finishMsg}`);
       alert(finishMsg);
     } catch (err) {
       const errorMsg = CONFIG.UI.MSG_ABORTED(err.message);
-      console.error('[NotebookLM bulk-delete] Aborted:', err);
+      console.error('[Gemini Notebook bulk-delete] Aborted:', err);
       alert(errorMsg);
     } finally {
       // Restore UI
