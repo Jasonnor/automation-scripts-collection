@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini Notebook bulk-delete helper
 // @namespace    http://tampermonkey.net/
-// @version      2026-07-28
+// @version      2026-08-09.1
 // @author       Jasonnor
 // @description  Adds a floating button that deletes every note in the current Gemini Notebook view (by clicking the UI just as a human would). USE WITH CARE!
 // @match        https://notebook.google.com/*
@@ -22,13 +22,18 @@
 
   const CONFIG = {
     SELECTORS: {
-      KEBAB_ICON: 'project-action-button > button > mat-icon',
+      // Menu trigger button (not the inner mat-icon).
+      KEBAB_BUTTON: 'project-action-button > button',
       DELETE_MENU_ITEM: 'button.mat-mdc-menu-item.project-button-hamburger-menu-action.delete-button',
-      CONFIRM_BUTTON: 'button.mdc-button.mat-mdc-button-base.primary-button.mat-mdc-unelevated-button',
+      CONFIRM_DIALOG: 'confirm-dialog',
+      // Matches the current NotebookLM confirm-dialog markup (yes-button / 刪除).
+      CONFIRM_BUTTON: 'confirm-dialog button.yes-button',
     },
     TIMEOUTS: {
       ELEMENT_WAIT: 8000,
-      POLL_INTERVAL: 150,
+      POLL_INTERVAL: 50,
+      // Material dialog transition is ~150ms; click confirm only after it settles.
+      DIALOG_OPEN_SETTLE: 150,
       DOM_SETTLE: 100,
     },
     UI: {
@@ -65,24 +70,43 @@
     return null;
   }
 
+  /**
+   * Polls until no element matches `selector`, or timeout.
+   * @returns {Promise<boolean>} True if gone, false if still present at timeout.
+   */
+  async function waitForElementGone(selector, timeout = CONFIG.TIMEOUTS.ELEMENT_WAIT) {
+    const end = Date.now() + timeout;
+    while (Date.now() < end) {
+      if (!document.querySelector(selector)) return true;
+      await sleep(CONFIG.TIMEOUTS.POLL_INTERVAL);
+    }
+    return !document.querySelector(selector);
+  }
+
   /* ---------- core logic -------------------------------------- */
   /**
    * Deletes a single note by interacting with the UI menu.
    * @returns {Promise<boolean>} True if deleted, false if no notes remain.
    */
   async function deleteOneNote() {
-    const icon = await waitForElement(CONFIG.SELECTORS.KEBAB_ICON, 5000);
-    if (!icon) return false;
-
-    icon.click();
+    const menuBtn = await waitForElement(CONFIG.SELECTORS.KEBAB_BUTTON, 5000);
+    if (!menuBtn) return false;
+    menuBtn.click();
 
     const deleteBtn = await waitForElement(CONFIG.SELECTORS.DELETE_MENU_ITEM, 5000);
     if (!deleteBtn) throw new Error('Delete menu item not found');
     deleteBtn.click();
 
-    const confirmBtn = await waitForElement(CONFIG.SELECTORS.CONFIRM_BUTTON, 5000);
-    if (!confirmBtn) throw new Error('Confirmation "Yes" button not found');
+    if (!(await waitForElement(CONFIG.SELECTORS.CONFIRM_BUTTON, 5000))) {
+      throw new Error('Confirmation delete button not found');
+    }
+    await sleep(CONFIG.TIMEOUTS.DIALOG_OPEN_SETTLE);
+    const confirmBtn = document.querySelector(CONFIG.SELECTORS.CONFIRM_BUTTON);
+    if (!confirmBtn) throw new Error('Confirmation delete button disappeared');
     confirmBtn.click();
+
+    const closed = await waitForElementGone(CONFIG.SELECTORS.CONFIRM_DIALOG, 5000);
+    if (!closed) throw new Error('Confirmation dialog did not close after delete');
 
     await sleep(CONFIG.TIMEOUTS.DOM_SETTLE);
     return true;
