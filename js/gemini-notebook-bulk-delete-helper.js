@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini Notebook bulk-delete helper
 // @namespace    http://tampermonkey.net/
-// @version      2026-08-09.1
+// @version      2026-08-19.1
 // @author       Jasonnor
 // @description  Adds a floating button that deletes every note in the current Gemini Notebook view (by clicking the UI just as a human would). USE WITH CARE!
 // @match        https://notebook.google.com/*
@@ -22,9 +22,12 @@
 
   const CONFIG = {
     SELECTORS: {
-      // Menu trigger button (not the inner mat-icon).
-      KEBAB_BUTTON: 'project-action-button > button',
-      DELETE_MENU_ITEM: 'button.mat-mdc-menu-item.project-button-hamburger-menu-action.delete-button',
+      // Menu trigger button (not the inner mat-icon). The button sits inside an
+      // <nb-icon-button> wrapper, so match by descendant rather than direct child.
+      KEBAB_BUTTON: 'project-action-button button.mat-mdc-menu-trigger',
+      // Menu items render in the CDK overlay, outside the row. Match on the
+      // delete-specific class only, so extra Angular classes do not break it.
+      DELETE_MENU_ITEM: 'button.mat-mdc-menu-item.delete-button',
       CONFIRM_DIALOG: 'confirm-dialog',
       // Matches the current NotebookLM confirm-dialog markup (yes-button / 刪除).
       CONFIRM_BUTTON: 'confirm-dialog button.yes-button',
