@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Gemini Notebook bulk-delete helper
 // @namespace    http://tampermonkey.net/
-// @version      2026-08-19.1
+// @version      2026-08-23.1
 // @author       Jasonnor
 // @description  Adds a floating button that deletes every note in the current Gemini Notebook view (by clicking the UI just as a human would). USE WITH CARE!
 // @match        https://notebook.google.com/*
@@ -30,7 +30,9 @@
       DELETE_MENU_ITEM: 'button.mat-mdc-menu-item.delete-button',
       CONFIRM_DIALOG: 'confirm-dialog',
       // Matches the current NotebookLM confirm-dialog markup (yes-button / 刪除).
-      CONFIRM_BUTTON: 'confirm-dialog button.yes-button',
+      // The class sits on the wrapping <nb-button> in newer markup, so match both.
+      CONFIRM_BUTTON:
+        'confirm-dialog button.yes-button, confirm-dialog nb-button.yes-button button',
     },
     TIMEOUTS: {
       ELEMENT_WAIT: 8000,
