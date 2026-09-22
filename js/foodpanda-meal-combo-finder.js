@@ -18,6 +18,7 @@
     DEFAULT_MAX_QTY: 1,
     RESULT_COUNT: 10,
     MAX_DISTINCT: 4,
+    SEARCH_DEBOUNCE_MS: 300,
     VOUCHER_CODE: '爽爽送',
     SELECTORS: {
       PRODUCT: '[data-testid="menu-product"]',
@@ -686,19 +687,25 @@
     }, 2200);
   }
 
-  function removeFromAllowed(id) {
-    state.excluded.add(id);
-    renderProducts();
-    if (!state.lastResults.length) {
-      const status = productStatusMessage(null);
-      setStatus(status.msg, status.isError);
-      return;
-    }
+  let searchTimer = 0;
+
+  function requestSearch() {
     if (state.searching) {
       state.pendingResearch = true;
       return;
     }
     runSearch();
+  }
+
+  function requestSearchSoon() {
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(requestSearch, CONFIG.SEARCH_DEBOUNCE_MS);
+  }
+
+  function removeFromAllowed(id) {
+    state.excluded.add(id);
+    renderProducts();
+    requestSearch();
   }
 
   function makeJumpButton(product, className = 'fpc-jump') {
@@ -780,6 +787,7 @@
         if (state.excluded.has(p.id)) state.excluded.delete(p.id);
         else state.excluded.add(p.id);
         renderProducts();
+        requestSearch();
       });
 
       row.append(img, meta, toggle);
@@ -980,7 +988,10 @@
     targetInput.min = '1';
     targetInput.step = '1';
     targetInput.value = String(initialTarget);
-    targetInput.addEventListener('input', renderSummary);
+    targetInput.addEventListener('input', () => {
+      renderSummary();
+      requestSearchSoon();
+    });
     targetLabel.appendChild(targetInput);
 
     const maxLabel = document.createElement('label');
@@ -991,6 +1002,7 @@
     maxInput.min = '1';
     maxInput.step = '1';
     maxInput.value = String(CONFIG.DEFAULT_MAX_QTY);
+    maxInput.addEventListener('input', requestSearchSoon);
     maxLabel.appendChild(maxInput);
 
     controls.append(targetLabel, maxLabel);
@@ -1005,13 +1017,13 @@
     refreshBtn.type = 'button';
     refreshBtn.className = 'fpc-btn fpc-btn-secondary';
     refreshBtn.textContent = 'Refresh';
-    refreshBtn.addEventListener('click', () => refreshProducts());
+    refreshBtn.addEventListener('click', () => requestSearch());
     const findBtn = document.createElement('button');
     findBtn.type = 'button';
     findBtn.id = 'fpc-find';
     findBtn.className = 'fpc-btn fpc-btn-primary';
     findBtn.textContent = 'Find Combos';
-    findBtn.addEventListener('click', () => runSearch());
+    findBtn.addEventListener('click', () => requestSearch());
     actions.append(refreshBtn, findBtn);
 
     const status = document.createElement('div');
@@ -1031,7 +1043,7 @@
     includeAll.addEventListener('click', () => {
       state.excluded.clear();
       renderProducts();
-      setStatus(`${state.products.length} products · ${state.products.length} included`);
+      requestSearch();
     });
     const excludeAll = document.createElement('button');
     excludeAll.type = 'button';
@@ -1040,7 +1052,7 @@
     excludeAll.addEventListener('click', () => {
       state.products.forEach((p) => state.excluded.add(p.id));
       renderProducts();
-      setStatus(`${state.products.length} products · 0 included`);
+      requestSearch();
     });
     productTools.append(includeAll, excludeAll);
     const productList = document.createElement('div');
