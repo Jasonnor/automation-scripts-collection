@@ -3,10 +3,14 @@
 // @namespace    http://tampermonkey.net/
 // @version      2026-09-22
 // @author       Jasonnor
-// @description  Find menu combinations that meet a coupon minimum (default $260), accounting for the current cart subtotal.
+// @description  Find menu combinations that meet a coupon minimum (default $260), accounting for the current cart subtotal. Exclusions can sync to a GitHub App installed on one private repository.
 // @match        *://www.foodpanda.com.tw/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=foodpanda.com.tw
-// @grant        none
+// @connect      github.com
+// @connect      api.github.com
+// @grant        GM_getValue
+// @grant        GM_setValue
+// @grant        GM_xmlhttpRequest
 // @run-at       document-idle
 // ==/UserScript==
 
@@ -20,6 +24,11 @@
     MAX_DISTINCT: 4,
     SEARCH_DEBOUNCE_MS: 300,
     VOUCHER_CODE: '爽爽送',
+    // Public client id from the GitHub App settings page. Empty until that app exists.
+    GITHUB_CLIENT_ID: 'Iv23liSV5Q2tMc3RyHAq',
+    LIST_PATH: 'foodpanda-combo-lists.json',
+    STORAGE_TOKEN: 'fp-combo-sync-token',
+    STORAGE_REPO: 'fp-combo-sync-repo',
     SELECTORS: {
       PRODUCT: '[data-testid="menu-product"]',
       NAME: '[data-testid="menu-product-name"]',
@@ -51,6 +60,15 @@
     searching: false,
     pendingResearch: false,
     subtotal: 0,
+    restaurantCode: '',
+    savedIds: [],
+    token: '',
+    connectedRepo: null,
+    canSave: true,
+    listLoading: false,
+    loadGeneration: 0,
+    connectGeneration: 0,
+    pendingSyncStatus: null,
   };
 
   function parsePrice(text) {
@@ -82,6 +100,150 @@
     return `$${Number(n).toLocaleString('en-US')}`;
   }
 
+  function restaurantCode(pathname) {
+    const parts = String(pathname || '').split('/').filter(Boolean);
+    const index = parts.findIndex((part) => part.toLowerCase() === 'restaurant');
+    if (index === -1 || !parts[index + 1]) return '';
+    return parts[index + 1];
+  }
+
+  function nextStoredIds(storedIds, products, excludedIds) {
+    const excluded = new Set(excludedIds);
+    const onPage = new Map(products.map((product) => [product.id, product]));
+    const next = new Set();
+    for (const id of storedIds) {
+      const product = onPage.get(id);
+      if (!product) next.add(id);
+      else if (excluded.has(id) && product.stableId) next.add(id);
+    }
+    for (const product of products) {
+      if (product.stableId && excluded.has(product.id)) next.add(product.id);
+    }
+    return [...next].sort();
+  }
+
+  function visibleExclusions(excludedIds, productIds, keepMissing) {
+    if (keepMissing) return [...excludedIds];
+    const onPage = new Set(productIds);
+    return [...excludedIds].filter((id) => onPage.has(id));
+  }
+
+  function invalidLists() {
+    const err = new Error('invalid lists file');
+    err.code = 'invalid';
+    return err;
+  }
+
+  function parseLists(text) {
+    if (!text || !String(text).trim()) return { stores: {} };
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw invalidLists();
+    }
+    if (
+      !data ||
+      typeof data !== 'object' ||
+      Array.isArray(data) ||
+      !data.stores ||
+      typeof data.stores !== 'object' ||
+      Array.isArray(data.stores)
+    ) {
+      throw invalidLists();
+    }
+    for (const value of Object.values(data.stores)) {
+      if (!Array.isArray(value) || value.some((id) => typeof id !== 'string')) throw invalidLists();
+    }
+    return { stores: data.stores };
+  }
+
+  function fileWithStore(doc, code, ids) {
+    const stores = { ...doc.stores };
+    const unique = [...new Set(ids)].filter((id) => typeof id === 'string').sort();
+    if (unique.length) stores[code] = unique;
+    else delete stores[code];
+    const ordered = {};
+    for (const key of Object.keys(stores).sort()) ordered[key] = [...stores[key]].sort();
+    return { stores: ordered };
+  }
+
+  async function saveStoreFile({ read, write, code, ids }) {
+    let current = await read();
+    let doc = parseLists(current.text);
+    let next = fileWithStore(doc, code, ids);
+    const bodyFor = (document, sha) => ({
+      text: `${JSON.stringify(document, null, 2)}\n`,
+      sha,
+    });
+    try {
+      await write(bodyFor(next, current.sha));
+    } catch (err) {
+      if (err.code !== 'conflict') throw err;
+      current = await read();
+      doc = parseLists(current.text);
+      next = fileWithStore(doc, code, ids);
+      await write(bodyFor(next, current.sha));
+    }
+  }
+
+  function reposFromInstallations(pages) {
+    let count = 0;
+    const repos = [];
+    for (const page of pages) {
+      const listed = page.repositories || [];
+      const reported = Number(page.total_count);
+      count += Number.isFinite(reported) ? reported : listed.length;
+      for (const repo of listed) repos.push({ owner: repo.owner.login, name: repo.name });
+    }
+    return { count, repos };
+  }
+
+  function soleRepository(count, repos) {
+    if (count !== 1 || repos.length !== 1) return null;
+    return repos[0];
+  }
+
+  function createSaveSequencer(run) {
+    let running = false;
+    let pending = null;
+    let chain = Promise.resolve();
+    return (payload) => {
+      pending = payload;
+      if (running) return chain;
+      running = true;
+      chain = (async () => {
+        try {
+          while (pending) {
+            const current = pending;
+            pending = null;
+            try {
+              await run(current);
+            } catch (err) {
+              if (!pending) throw err;
+            }
+          }
+        } finally {
+          running = false;
+        }
+      })();
+      return chain;
+    };
+  }
+
+  function encodeBase64Utf8(text) {
+    const bytes = new TextEncoder().encode(text);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
+    return btoa(binary);
+  }
+
+  function decodeBase64Utf8(content) {
+    const binary = atob(String(content).replace(/\s/g, ''));
+    const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  }
+
   function isRestaurantPage() {
     return /\/restaurant\//i.test(location.pathname);
   }
@@ -90,8 +252,8 @@
     const stepper = card.querySelector(CONFIG.SELECTORS.STEPPER);
     const rawId = stepper?.id || '';
     const match = rawId.match(/quantity-stepper-(.+)/);
-    if (match) return match[1];
-    return `${name}:${price}`;
+    if (match) return { id: match[1], stableId: true };
+    return { id: `${name}:${price}`, stableId: false };
   }
 
   function scrapeSubtotal() {
@@ -137,7 +299,7 @@
       const name = nameEl?.textContent?.trim() || '';
       const price = readCardPrice(card);
       const image = card.querySelector(CONFIG.SELECTORS.IMAGE)?.getAttribute('src') || '';
-      const id = extractProductId(card, name, price);
+      const { id, stableId } = extractProductId(card, name, price);
 
       if (!id || !name || price == null) {
         skipped += 1;
@@ -147,7 +309,7 @@
       if (seen.has(id) || seen.has(dupKey)) continue;
       seen.add(id);
       seen.add(dupKey);
-      products.push({ id, name, price, image });
+      products.push({ id, name, price, image, stableId });
     }
 
     if (products.length === 0) {
@@ -358,6 +520,14 @@
         flex-direction: column;
         gap: 14px;
       }
+      #${CONFIG.UI.PANEL_ID} .fpc-sync {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      #${CONFIG.UI.PANEL_ID} .fpc-sync .fpc-status { flex: 1; }
+      #${CONFIG.UI.PANEL_ID} .fpc-sync .fpc-btn { flex-shrink: 0; }
       #${CONFIG.UI.PANEL_ID} .fpc-section-title {
         margin: 0 0 8px;
         font-size: 12px;
@@ -702,10 +872,18 @@
     searchTimer = window.setTimeout(requestSearch, CONFIG.SEARCH_DEBOUNCE_MS);
   }
 
-  function removeFromAllowed(id) {
-    state.excluded.add(id);
+  function changeExcluded(mutate) {
+    if (state.listLoading) return;
+    mutate();
     renderProducts();
     requestSearch();
+    scheduleSave();
+  }
+
+  function removeFromAllowed(id) {
+    changeExcluded(() => {
+      state.excluded.add(id);
+    });
   }
 
   function makeJumpButton(product, className = 'fpc-jump') {
@@ -784,10 +962,10 @@
       toggle.title = excluded ? 'Excluded — click to include' : 'Included — click to exclude';
       toggle.setAttribute('aria-pressed', excluded ? 'false' : 'true');
       toggle.addEventListener('click', () => {
-        if (state.excluded.has(p.id)) state.excluded.delete(p.id);
-        else state.excluded.add(p.id);
-        renderProducts();
-        requestSearch();
+        changeExcluded(() => {
+          if (state.excluded.has(p.id)) state.excluded.delete(p.id);
+          else state.excluded.add(p.id);
+        });
       });
 
       row.append(img, meta, toggle);
@@ -863,10 +1041,13 @@
 
   function refreshProducts() {
     const { products, skipped, error } = scrapeProducts();
-    const nextIds = new Set(products.map((p) => p.id));
-    for (const id of [...state.excluded]) {
-      if (!nextIds.has(id)) state.excluded.delete(id);
-    }
+    state.excluded = new Set(
+      visibleExclusions(
+        [...state.excluded],
+        products.map((p) => p.id),
+        Boolean(state.token),
+      ),
+    );
     state.products = products;
     state.skipped = skipped;
     state.subtotal = scrapeSubtotal();
@@ -970,6 +1151,22 @@
     const body = document.createElement('div');
     body.className = 'fpc-body';
 
+    const syncRow = document.createElement('div');
+    syncRow.className = 'fpc-sync';
+    const syncStatus = document.createElement('div');
+    syncStatus.id = 'fpc-sync-status';
+    syncStatus.className = 'fpc-status';
+    const syncButton = document.createElement('button');
+    syncButton.type = 'button';
+    syncButton.id = 'fpc-sync-toggle';
+    syncButton.className = 'fpc-btn fpc-btn-secondary';
+    syncButton.textContent = state.token ? 'Disconnect' : 'Connect';
+    syncButton.addEventListener('click', () => {
+      if (state.token) disconnect();
+      else void startConnect();
+    });
+    syncRow.append(syncStatus, syncButton);
+
     const controlsWrap = document.createElement('div');
     const controlsTitle = document.createElement('div');
     controlsTitle.className = 'fpc-section-title';
@@ -1041,18 +1238,18 @@
     includeAll.className = 'fpc-btn fpc-btn-secondary';
     includeAll.textContent = 'Include all';
     includeAll.addEventListener('click', () => {
-      state.excluded.clear();
-      renderProducts();
-      requestSearch();
+      changeExcluded(() => {
+        state.excluded.clear();
+      });
     });
     const excludeAll = document.createElement('button');
     excludeAll.type = 'button';
     excludeAll.className = 'fpc-btn fpc-btn-secondary';
     excludeAll.textContent = 'Exclude all';
     excludeAll.addEventListener('click', () => {
-      state.products.forEach((p) => state.excluded.add(p.id));
-      renderProducts();
-      requestSearch();
+      changeExcluded(() => {
+        state.products.forEach((p) => state.excluded.add(p.id));
+      });
     });
     productTools.append(includeAll, excludeAll);
     const productList = document.createElement('div');
@@ -1069,9 +1266,11 @@
     results.className = 'fpc-results';
     resultsWrap.append(resultsTitle, results);
 
-    body.append(controlsWrap, actions, status, productsWrap, resultsWrap);
+    body.append(syncRow, controlsWrap, actions, status, productsWrap, resultsWrap);
     panel.append(header, body);
     root.append(overlay, panel);
+    renderSyncStatus();
+    updateSyncButton(false);
   }
 
   function createFab(root) {
@@ -1161,9 +1360,419 @@
     document.getElementById(CONFIG.UI.STYLES_ID)?.remove();
   }
 
+  function storageGet(key, fallback) {
+    if (typeof GM_getValue !== 'function') return fallback;
+    const value = GM_getValue(key, fallback);
+    return value == null ? fallback : value;
+  }
+
+  function storageSet(key, value) {
+    if (typeof GM_setValue === 'function') GM_setValue(key, value);
+  }
+
+  function setSyncStatus(msg, isError = false) {
+    state.pendingSyncStatus = { msg, isError: Boolean(isError) };
+    renderSyncStatus();
+  }
+
+  function renderSyncStatus() {
+    const pending = state.pendingSyncStatus;
+    const el = document.getElementById('fpc-sync-status');
+    if (!pending || !el) return;
+    el.textContent = pending.msg || '';
+    el.classList.toggle('error', Boolean(pending.isError && pending.msg));
+  }
+
+  function updateSyncButton(busy) {
+    const button = document.getElementById('fpc-sync-toggle');
+    if (!button) return;
+    button.disabled = Boolean(busy);
+    button.textContent = state.token ? 'Disconnect' : 'Connect';
+  }
+
+  function connectedMessage() {
+    const repo = state.connectedRepo;
+    return repo ? `Syncing to ${repo.owner}/${repo.name}` : 'Not connected';
+  }
+
+  function installRejectionMessage(count) {
+    if (count === 0) return 'Install the GitHub App on one private repository, then connect again.';
+    return `The GitHub App can see ${count} repositories. Install it on one private repository, then connect again.`;
+  }
+
+  function forgetCredentials() {
+    state.token = '';
+    state.connectedRepo = null;
+    state.canSave = true;
+    state.listLoading = false;
+    storageSet(CONFIG.STORAGE_TOKEN, '');
+    storageSet(CONFIG.STORAGE_REPO, null);
+  }
+
+  function gmRequest(details) {
+    return new Promise((resolve, reject) => {
+      if (typeof GM_xmlhttpRequest !== 'function') {
+        const err = new Error('network');
+        err.code = 'network';
+        reject(err);
+        return;
+      }
+      GM_xmlhttpRequest({
+        method: details.method,
+        url: details.url,
+        headers: details.headers,
+        data: details.data,
+        onload: (response) => resolve({ status: response.status, text: response.responseText || '' }),
+        onerror: () => {
+          const err = new Error('network');
+          err.code = 'network';
+          reject(err);
+        },
+        ontimeout: () => {
+          const err = new Error('network');
+          err.code = 'network';
+          reject(err);
+        },
+      });
+    });
+  }
+
+  function parseResponseBody(text) {
+    if (!text) return null;
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  }
+
+  async function githubRequest(path, { method = 'GET', token, body } = {}) {
+    const headers = {
+      Accept: 'application/vnd.github+json',
+      'User-Agent': 'foodpanda-meal-combo-finder',
+      'X-GitHub-Api-Version': '2022-11-28',
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+    if (body !== undefined) headers['Content-Type'] = 'application/json';
+    const response = await gmRequest({
+      method,
+      url: `https://api.github.com${path}`,
+      headers,
+      data: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (response.status === 401) {
+      const err = new Error('unauthorized');
+      err.status = 401;
+      throw err;
+    }
+    return { status: response.status, body: parseResponseBody(response.text) };
+  }
+
+  async function readListFile() {
+    const repo = state.connectedRepo;
+    const response = await githubRequest(
+      `/repos/${repo.owner}/${repo.name}/contents/${CONFIG.LIST_PATH}`,
+      { token: state.token },
+    );
+    if (response.status === 404) return { text: '', sha: null };
+    if (response.status !== 200 || !response.body) {
+      const err = new Error('read failed');
+      err.status = response.status;
+      throw err;
+    }
+    return {
+      text: decodeBase64Utf8(response.body.content || ''),
+      sha: response.body.sha,
+    };
+  }
+
+  async function writeListFile({ text, sha }) {
+    const repo = state.connectedRepo;
+    const body = {
+      message: 'Update combo exclusions',
+      content: encodeBase64Utf8(text),
+    };
+    if (sha) body.sha = sha;
+    const response = await githubRequest(
+      `/repos/${repo.owner}/${repo.name}/contents/${CONFIG.LIST_PATH}`,
+      { method: 'PUT', token: state.token, body },
+    );
+    if (response.status === 409) {
+      const err = new Error('conflict');
+      err.code = 'conflict';
+      throw err;
+    }
+    if (response.status !== 200 && response.status !== 201) {
+      const err = new Error('write failed');
+      err.status = response.status;
+      throw err;
+    }
+  }
+
+  async function listAccessibleRepos() {
+    const response = await githubRequest('/user/installations', { token: state.token });
+    if (response.status !== 200) {
+      const err = new Error('installations failed');
+      err.status = response.status;
+      throw err;
+    }
+    const pages = [];
+    for (const installation of response.body?.installations || []) {
+      const repos = await githubRequest(
+        `/user/installations/${installation.id}/repositories?per_page=100`,
+        { token: state.token },
+      );
+      if (repos.status !== 200 || !repos.body) {
+        const err = new Error('repositories failed');
+        err.status = repos.status;
+        throw err;
+      }
+      pages.push(repos.body);
+    }
+    return reposFromInstallations(pages);
+  }
+
+  function rejectBroadInstall(count) {
+    forgetCredentials();
+    setSyncStatus(installRejectionMessage(count), true);
+    updateSyncButton(false);
+  }
+
+  async function loadExclusions(code, generation) {
+    if (!state.token || !state.connectedRepo) return;
+    state.listLoading = true;
+    setSyncStatus('Loading exclusions…');
+    try {
+      const file = await readListFile();
+      if (generation !== state.loadGeneration || code !== state.restaurantCode || !state.token) return;
+      const doc = parseLists(file.text);
+      const ids = [...(doc.stores[code] || [])];
+      state.savedIds = ids;
+      state.excluded = new Set(ids);
+      state.canSave = true;
+      state.listLoading = false;
+      setSyncStatus(connectedMessage());
+      if (isOpen()) refreshProducts();
+    } catch (err) {
+      if (generation !== state.loadGeneration || code !== state.restaurantCode) return;
+      state.listLoading = false;
+      if (err.status === 401) {
+        forgetCredentials();
+        setSyncStatus('GitHub rejected the token. Connect again.', true);
+        updateSyncButton(false);
+        return;
+      }
+      state.canSave = false;
+      if (err.code === 'invalid') {
+        setSyncStatus('The lists file on GitHub is not valid. It was left unchanged.', true);
+        return;
+      }
+      setSyncStatus('Could not load exclusions.', true);
+    }
+  }
+
+  const enqueueSave = createSaveSequencer(async (payload) => {
+    await saveStoreFile({
+      read: readListFile,
+      write: writeListFile,
+      code: payload.code,
+      ids: payload.ids,
+    });
+    if (state.restaurantCode === payload.code) state.savedIds = payload.ids;
+    setSyncStatus(connectedMessage());
+  });
+
+  function scheduleSave() {
+    if (!state.canSave || !state.token || !state.connectedRepo || !state.restaurantCode) return;
+    const ids = nextStoredIds(state.savedIds, state.products, [...state.excluded]);
+    void enqueueSave({ code: state.restaurantCode, ids }).catch((err) => {
+      if (err.status === 401) {
+        forgetCredentials();
+        setSyncStatus('GitHub rejected the token. Connect again.', true);
+        updateSyncButton(false);
+        return;
+      }
+      if (err.code === 'invalid') {
+        setSyncStatus('The lists file on GitHub is not valid. It was left unchanged.', true);
+        return;
+      }
+      setSyncStatus('Could not save exclusions.', true);
+    });
+  }
+
+  function switchRestaurant(code) {
+    if (code === state.restaurantCode) return;
+    state.restaurantCode = code;
+    state.excluded = new Set();
+    state.savedIds = [];
+    state.loadGeneration += 1;
+    if (state.token) {
+      state.canSave = false;
+      state.listLoading = true;
+      void loadExclusions(code, state.loadGeneration);
+    } else {
+      state.canSave = true;
+      state.listLoading = false;
+    }
+    if (isOpen()) refreshProducts();
+  }
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  async function oauthRequest(url, body) {
+    const response = await gmRequest({
+      method: 'POST',
+      url,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'User-Agent': 'foodpanda-meal-combo-finder',
+      },
+      data: JSON.stringify(body),
+    });
+    return { status: response.status, body: parseResponseBody(response.text) || {} };
+  }
+
+  async function startConnect() {
+    if (!CONFIG.GITHUB_CLIENT_ID) {
+      setSyncStatus('Add the GitHub App client id to the script before connecting.', true);
+      return;
+    }
+    const generation = ++state.connectGeneration;
+    updateSyncButton(true);
+    try {
+      const started = await oauthRequest('https://github.com/login/device/code', {
+        client_id: CONFIG.GITHUB_CLIENT_ID,
+      });
+      if (generation !== state.connectGeneration) return;
+      const deviceCode = started.body.device_code;
+      const userCode = started.body.user_code;
+      if (!deviceCode || !userCode) {
+        setSyncStatus('GitHub did not start a login.', true);
+        return;
+      }
+      const verification = started.body.verification_uri || 'https://github.com/login/device';
+      setSyncStatus(`Enter ${userCode} at ${verification}`);
+      const interval = Math.max(5, Number(started.body.interval) || 5);
+      const deadline = Date.now() + (Number(started.body.expires_in) || 900) * 1000;
+      let wait = interval;
+      let token = '';
+      while (Date.now() < deadline) {
+        await sleep(wait * 1000);
+        if (generation !== state.connectGeneration) return;
+        const polled = await oauthRequest('https://github.com/login/oauth/access_token', {
+          client_id: CONFIG.GITHUB_CLIENT_ID,
+          device_code: deviceCode,
+          grant_type: 'urn:ietf:params:oauth:grant-type:device_code',
+        });
+        if (generation !== state.connectGeneration) return;
+        if (polled.body.access_token) {
+          token = polled.body.access_token;
+          break;
+        }
+        if (polled.body.error === 'authorization_pending') {
+          wait = interval;
+          continue;
+        }
+        if (polled.body.error === 'slow_down') {
+          wait = Number(polled.body.interval) || wait + 5;
+          continue;
+        }
+        setSyncStatus('GitHub login was not approved.', true);
+        return;
+      }
+      if (!token) {
+        setSyncStatus('GitHub login expired. Connect again.', true);
+        return;
+      }
+      state.token = token;
+      const listed = await listAccessibleRepos();
+      if (generation !== state.connectGeneration) {
+        const storedToken = storageGet(CONFIG.STORAGE_TOKEN, '');
+        const storedRepo = storageGet(CONFIG.STORAGE_REPO, null);
+        state.token = storedToken || '';
+        state.connectedRepo = storedRepo && storedRepo.owner && storedRepo.name ? storedRepo : null;
+        return;
+      }
+      const sole = soleRepository(listed.count, listed.repos);
+      if (!sole) {
+        rejectBroadInstall(listed.count);
+        return;
+      }
+      storageSet(CONFIG.STORAGE_TOKEN, token);
+      storageSet(CONFIG.STORAGE_REPO, sole);
+      state.connectedRepo = sole;
+      state.canSave = false;
+      setSyncStatus(connectedMessage());
+      if (state.restaurantCode) await loadExclusions(state.restaurantCode, state.loadGeneration);
+    } catch (err) {
+      if (generation !== state.connectGeneration) return;
+      const storedToken = storageGet(CONFIG.STORAGE_TOKEN, '');
+      const storedRepo = storageGet(CONFIG.STORAGE_REPO, null);
+      state.token = storedToken || '';
+      state.connectedRepo = storedRepo && storedRepo.owner && storedRepo.name ? storedRepo : null;
+      if (!state.token) state.canSave = true;
+      setSyncStatus(err.status === 401 ? 'GitHub rejected the login.' : 'Could not reach GitHub.', true);
+    } finally {
+      if (generation === state.connectGeneration) updateSyncButton(false);
+    }
+  }
+
+  function disconnect() {
+    state.connectGeneration += 1;
+    forgetCredentials();
+    setSyncStatus('Not connected');
+    updateSyncButton(false);
+  }
+
+  async function restoreSync() {
+    const token = storageGet(CONFIG.STORAGE_TOKEN, '');
+    const repo = storageGet(CONFIG.STORAGE_REPO, null);
+    if (!token || !repo || !repo.owner || !repo.name) {
+      setSyncStatus('Not connected');
+      updateSyncButton(false);
+      return;
+    }
+    state.token = token;
+    state.connectedRepo = repo;
+    state.canSave = false;
+    state.listLoading = true;
+    updateSyncButton(false);
+    setSyncStatus(connectedMessage());
+    try {
+      const listed = await listAccessibleRepos();
+      const sole = soleRepository(listed.count, listed.repos);
+      if (!sole) {
+        rejectBroadInstall(listed.count);
+        return;
+      }
+      state.connectedRepo = sole;
+      storageSet(CONFIG.STORAGE_REPO, sole);
+      setSyncStatus(connectedMessage());
+    } catch (err) {
+      if (err.status === 401) {
+        forgetCredentials();
+        setSyncStatus('GitHub rejected the token. Connect again.', true);
+        updateSyncButton(false);
+        return;
+      }
+    }
+    if (state.token && state.restaurantCode) {
+      await loadExclusions(state.restaurantCode, state.loadGeneration);
+    } else {
+      state.listLoading = false;
+    }
+  }
+
   function syncToRoute() {
-    if (isRestaurantPage()) mountUi();
-    else unmountUi();
+    if (!isRestaurantPage()) {
+      unmountUi();
+      return;
+    }
+    mountUi();
+    switchRestaurant(restaurantCode(location.pathname));
   }
 
   function watchSpaNavigation() {
@@ -1192,9 +1801,26 @@
   function init() {
     syncToRoute();
     watchSpaNavigation();
+    void restoreSync();
   }
 
-  const api = { parsePrice, remainingNeed, parseShuangSongMov, findCombos, CONFIG };
+  const api = {
+    parsePrice,
+    remainingNeed,
+    parseShuangSongMov,
+    findCombos,
+    restaurantCode,
+    nextStoredIds,
+    visibleExclusions,
+    fileWithStore,
+    saveStoreFile,
+    reposFromInstallations,
+    soleRepository,
+    createSaveSequencer,
+    encodeBase64Utf8,
+    decodeBase64Utf8,
+    CONFIG,
+  };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }
