@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Foodpanda Meal Combo Finder
 // @namespace    http://tampermonkey.net/
-// @version      2026-09-19
+// @version      2026-09-22
 // @author       Jasonnor
 // @description  Find menu combinations that meet a coupon minimum (default $260), accounting for the current cart subtotal.
 // @match        *://www.foodpanda.com.tw/*
@@ -15,7 +15,7 @@
 
   const CONFIG = {
     DEFAULT_TARGET: 260,
-    DEFAULT_MAX_QTY: 2,
+    DEFAULT_MAX_QTY: 1,
     RESULT_COUNT: 10,
     MAX_DISTINCT: 4,
     VOUCHER_CODE: '爽爽送',
@@ -48,6 +48,7 @@
     skipped: 0,
     lastResults: [],
     searching: false,
+    pendingResearch: false,
     subtotal: 0,
   };
 
@@ -112,6 +113,14 @@
     return null;
   }
 
+  function readCardPrice(card) {
+    const priceEl = card.querySelector(CONFIG.SELECTORS.PRICE);
+    if (!priceEl) return null;
+    const clone = priceEl.cloneNode(true);
+    clone.querySelector(CONFIG.SELECTORS.PRICE_BEFORE)?.remove();
+    return parsePrice(clone.textContent);
+  }
+
   function scrapeProducts() {
     const cards = [...document.querySelectorAll(CONFIG.SELECTORS.PRODUCT)];
     if (cards.length === 0) {
@@ -125,14 +134,7 @@
     for (const card of cards) {
       const nameEl = card.querySelector(CONFIG.SELECTORS.NAME);
       const name = nameEl?.textContent?.trim() || '';
-      const priceEl = card.querySelector(CONFIG.SELECTORS.PRICE);
-      let priceText = '';
-      if (priceEl) {
-        const clone = priceEl.cloneNode(true);
-        clone.querySelector(CONFIG.SELECTORS.PRICE_BEFORE)?.remove();
-        priceText = clone.textContent;
-      }
-      const price = parsePrice(priceText);
+      const price = readCardPrice(card);
       const image = card.querySelector(CONFIG.SELECTORS.IMAGE)?.getAttribute('src') || '';
       const id = extractProductId(card, name, price);
 
@@ -458,12 +460,51 @@
         background: var(--fpc-soft);
       }
       #${CONFIG.UI.PANEL_ID} .fpc-product-meta { min-width: 0; }
+      #${CONFIG.UI.PANEL_ID} .fpc-name-row {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        min-width: 0;
+      }
+      #${CONFIG.UI.PANEL_ID} .fpc-jump {
+        appearance: none;
+        border: none;
+        background: transparent;
+        padding: 0;
+        margin: 0;
+        font: inherit;
+        color: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+      #${CONFIG.UI.PANEL_ID} .fpc-jump:hover {
+        color: var(--fpc-primary);
+        text-decoration: underline;
+      }
       #${CONFIG.UI.PANEL_ID} .fpc-product-name {
         font-size: 12px;
         font-weight: 560;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
+        min-width: 0;
+        max-width: 100%;
+        flex: 0 1 auto;
+      }
+      #${CONFIG.UI.PANEL_ID} .fpc-remove {
+        flex-shrink: 0;
+        border: none;
+        background: transparent;
+        color: var(--fpc-muted);
+        cursor: pointer;
+        font-size: 16px;
+        line-height: 1;
+        padding: 0 4px;
+        border-radius: 4px;
+      }
+      #${CONFIG.UI.PANEL_ID} .fpc-remove:hover {
+        color: var(--fpc-danger);
+        background: #fdecec;
       }
       #${CONFIG.UI.PANEL_ID} .fpc-product-price {
         font-size: 12px;
@@ -530,6 +571,10 @@
         gap: 4px;
       }
       #${CONFIG.UI.PANEL_ID} .fpc-lines li {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 4px;
         font-size: 12px;
         color: var(--fpc-text);
         line-height: 1.35;
@@ -566,6 +611,10 @@
         letter-spacing: 0.1px;
       }
       #${CONFIG.UI.ROOT_ID}.open #${CONFIG.UI.FAB_ID} { opacity: 1; }
+      .fpc-jump-target {
+        box-shadow: 0 0 0 3px ${CONFIG.STYLES.PRIMARY} !important;
+        border-radius: 12px;
+      }
     `;
     document.head.appendChild(style);
   }
@@ -595,6 +644,83 @@
 
   function isOpen() {
     return document.getElementById(CONFIG.UI.ROOT_ID)?.classList.contains('open');
+  }
+
+  let highlightedCard = null;
+  let highlightTimer = 0;
+
+  function locateProductCard(product) {
+    const stepper = document.getElementById(`quantity-stepper-${product.id}`);
+    const byId = stepper?.closest?.(CONFIG.SELECTORS.PRODUCT);
+    if (byId) return byId;
+
+    const cards = document.querySelectorAll(CONFIG.SELECTORS.PRODUCT);
+    let nameMatch = null;
+    for (const card of cards) {
+      const name = card.querySelector(CONFIG.SELECTORS.NAME)?.textContent?.trim();
+      if (name !== product.name) continue;
+      if (readCardPrice(card) === product.price) return card;
+      if (!nameMatch) nameMatch = card;
+    }
+    return nameMatch;
+  }
+
+  function jumpToProduct(product) {
+    const card = locateProductCard(product);
+    if (!card) {
+      setStatus(`Could not find ${product.name} on the menu.`, true);
+      return;
+    }
+    if (highlightedCard && highlightedCard !== card) {
+      highlightedCard.classList.remove('fpc-jump-target');
+    }
+    highlightedCard = card;
+    card.classList.add('fpc-jump-target');
+    setOpen(false);
+    document.getElementById(CONFIG.UI.FAB_ID)?.dispatchEvent(new Event('mouseleave'));
+    card.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+    window.clearTimeout(highlightTimer);
+    highlightTimer = window.setTimeout(() => {
+      card.classList.remove('fpc-jump-target');
+      if (highlightedCard === card) highlightedCard = null;
+    }, 2200);
+  }
+
+  function removeFromAllowed(id) {
+    state.excluded.add(id);
+    renderProducts();
+    if (!state.lastResults.length) {
+      const status = productStatusMessage(null);
+      setStatus(status.msg, status.isError);
+      return;
+    }
+    if (state.searching) {
+      state.pendingResearch = true;
+      return;
+    }
+    runSearch();
+  }
+
+  function makeJumpButton(product, className = 'fpc-jump') {
+    const name = document.createElement('button');
+    name.type = 'button';
+    name.className = className;
+    name.title = product.name;
+    name.textContent = product.name;
+    name.setAttribute('aria-label', `Show ${product.name} on the menu`);
+    name.addEventListener('click', () => jumpToProduct(product));
+    return name;
+  }
+
+  function makeRemoveButton(product) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fpc-remove';
+    btn.title = 'Remove from allowed combos';
+    btn.setAttribute('aria-label', `Remove ${product.name} from allowed combos`);
+    btn.textContent = '×';
+    btn.addEventListener('click', () => removeFromAllowed(product.id));
+    return btn;
   }
 
   function setStatus(msg, isError = false) {
@@ -636,14 +762,14 @@
 
       const meta = document.createElement('div');
       meta.className = 'fpc-product-meta';
-      const name = document.createElement('div');
-      name.className = 'fpc-product-name';
-      name.title = p.name;
-      name.textContent = p.name;
+      const nameRow = document.createElement('div');
+      nameRow.className = 'fpc-name-row';
+      nameRow.appendChild(makeJumpButton(p, 'fpc-jump fpc-product-name'));
+      if (!excluded) nameRow.appendChild(makeRemoveButton(p));
       const price = document.createElement('div');
       price.className = 'fpc-product-price';
       price.textContent = formatMoney(p.price);
-      meta.append(name, price);
+      meta.append(nameRow, price);
 
       const toggle = document.createElement('button');
       toggle.type = 'button';
@@ -704,8 +830,10 @@
         const li = document.createElement('li');
         const qty = document.createElement('span');
         qty.className = 'qty';
-        qty.textContent = `×${line.qty}`;
-        li.append(qty, document.createTextNode(` · ${line.name} · ${formatMoney(line.price)}`));
+        qty.textContent = `×${line.qty} ·`;
+        const price = document.createElement('span');
+        price.textContent = `· ${formatMoney(line.price)}`;
+        li.append(qty, makeJumpButton(line), makeRemoveButton(line), price);
         lines.appendChild(li);
       }
 
@@ -782,20 +910,29 @@
 
     requestAnimationFrame(() => {
       try {
-        const results = findCombos(included, remaining, maxQty);
+        const current = state.products.filter((p) => !state.excluded.has(p.id));
+        const results = current.length ? findCombos(current, remaining, maxQty) : [];
         renderResults(results);
-        setStatus(
-          results.length
-            ? `Found ${results.length} combination${results.length === 1 ? '' : 's'} (≥ ${formatMoney(remaining)}).`
-            : 'No combinations reach the remaining amount with the current settings.',
-          results.length === 0,
-        );
+        if (!current.length) {
+          setStatus('No included products. Include at least one item.', true);
+        } else {
+          setStatus(
+            results.length
+              ? `Found ${results.length} combination${results.length === 1 ? '' : 's'} (≥ ${formatMoney(remaining)}).`
+              : 'No combinations reach the remaining amount with the current settings.',
+            results.length === 0,
+          );
+        }
       } catch (err) {
         console.error('[Foodpanda Combo Finder]', err);
         setStatus(`Search failed: ${err.message || err}`, true);
       } finally {
         state.searching = false;
         if (findBtn) findBtn.disabled = false;
+        if (state.pendingResearch) {
+          state.pendingResearch = false;
+          runSearch();
+        }
       }
     });
   }
