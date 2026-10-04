@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Popularity Sorter (YouTube & Bilibili)
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.4.1
+// @version      2026.10.4.2
 // @description  Sort YouTube/Bilibili channel videos by popularity rating: Score = Views / √(Days + 7). Balances viral new content and enduring classic content.
 // @author       Jasonnor
 // @match        *://www.youtube.com/@*
@@ -183,8 +183,8 @@
         return {views: parseYTViews(viewText), days: parseYTDays(dateText || '')};
       },
 
-      getBadgeContainer(item) {
-        return item.querySelector('a.ytLockupViewModelContentImage');
+      getBadgeContainer() {
+        return null;
       },
     },
 
@@ -259,13 +259,15 @@
         if (pos === 'static') container.style.position = 'relative';
         container.appendChild(badge);
       } else {
-        // Append directly to the item element.
-        // For YouTube's ytd-rich-item-renderer the badge sits at top-left,
-        // overlapping the thumbnail area. Force a stacking context so it shows.
         item.style.setProperty('position', 'relative', 'important');
         item.style.setProperty('z-index', '0', 'important');
         item.appendChild(badge);
       }
+    }
+    if (badge.parentElement !== item && !adapter.getBadgeContainer(item)) {
+      item.style.setProperty('position', 'relative', 'important');
+      item.style.setProperty('z-index', '0', 'important');
+      item.appendChild(badge);
     }
     badge.textContent = '\u2605 ' + fmtScore(score);
     badge.title = 'Score = Views / sqrt(Days+7) ~= ' + fmtScore(score);
