@@ -141,8 +141,8 @@
   // ── Platform Adapters ──────────────────────────────────────────────────────
   const adapters = {
     youtube: {
-      accentColor: '#FF0000',
-      accentColorDark: '#CC0000',
+      accentColor: '#D23A3A',
+      accentColorDark: '#8E1C1C',
 
       isActivePage() {
         return /\/videos(\?|$|#|\/)/i.test(location.pathname + location.search);
@@ -404,7 +404,7 @@
     const el = document.getElementById('vps-status');
     if (!el) return;
     el.textContent = msg;
-    el.style.color = type === 'warn' ? '#b45309' : '#374151';
+    el.style.color = type === 'warn' ? '#fbbf24' : '#e4e4e7';
     el.style.opacity = '1';
     clearTimeout(statusClearTimer);
     statusClearTimer = setTimeout(() => {
@@ -477,10 +477,10 @@
       #vps-toggle {
         width: 48px !important;
         height: 48px !important;
-        background: ${acc} !important;
+        background: linear-gradient(145deg, ${acc} 0%, ${accDark} 100%) !important;
         color: white !important;
         border-radius: 50% !important;
-        box-shadow: 0 4px 14px rgba(0,0,0,0.25) !important;
+        box-shadow: 0 8px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -493,19 +493,19 @@
         outline: none !important;
       }
       #vps-toggle:hover {
-        transform: scale(1.08);
-        box-shadow: 0 6px 18px rgba(0,0,0,0.3);
-        background: ${accDark};
+        transform: scale(1.06);
+        box-shadow: 0 10px 22px rgba(0,0,0,0.42), inset 0 1px 0 rgba(255,255,255,0.35);
+        filter: brightness(1.08);
       }
       #vps-panel {
         margin-top: 10px;
-        background: rgba(255,255,255,0.97);
+        background: rgba(24,24,27,0.96);
         backdrop-filter: blur(14px);
         -webkit-backdrop-filter: blur(14px);
-        border: 1px solid rgba(0,0,0,0.09);
+        border: 1px solid rgba(255,255,255,0.12);
         border-radius: 16px;
         padding: 18px;
-        box-shadow: 0 10px 36px rgba(0,0,0,0.15);
+        box-shadow: 0 10px 36px rgba(0,0,0,0.45);
         width: 270px;
         display: none;
         flex-direction: column;
@@ -522,42 +522,42 @@
       #vps-header {
         font-size: 13px;
         font-weight: 700;
-        color: #111;
+        color: #f4f4f5;
         padding-bottom: 8px;
         border-bottom: 2px solid ${acc};
       }
       #vps-formula {
         font-size: 11px;
-        color: #555;
-        background: #f6f6f6;
+        color: #d4d4d8;
+        background: #27272a;
         border-radius: 7px;
         padding: 7px 10px;
         font-family: 'Courier New', monospace;
         line-height: 1.6;
       }
-      #vps-formula strong { color: #222; }
+      #vps-formula strong { color: #fafafa; }
       .vps-btn {
         display: flex;
         align-items: center;
         gap: 6px;
         width: 100%;
         padding: 9px 12px;
-        border: 1.5px solid #ddd;
+        border: 1.5px solid #3f3f46;
         border-radius: 9px;
         font-size: 13px;
         font-weight: 600;
         cursor: pointer;
-        background: #fff;
-        color: #333;
+        background: #27272a;
+        color: #f4f4f5;
         transition: all 0.18s;
         box-sizing: border-box;
         font-family: inherit;
         text-align: left;
       }
-      .vps-btn:hover { background: #f5f5f5; border-color: #bbb; }
-      .vps-btn-primary { background: ${acc}; color: #fff; border-color: ${acc}; }
-      .vps-btn-primary:hover { background: ${accDark}; border-color: ${accDark}; }
-      .vps-btn-active { background: #eff6ff; border-color: #3b82f6; color: #1d4ed8; }
+      .vps-btn:hover { background: #3f3f46; border-color: #52525b; }
+      .vps-btn-primary { background: linear-gradient(180deg, ${acc}, ${accDark}); color: #fff; border-color: transparent; box-shadow: inset 0 1px 0 rgba(255,255,255,0.28); }
+      .vps-btn-primary:hover { background: linear-gradient(180deg, ${acc}, ${accDark}); filter: brightness(1.08); border-color: transparent; }
+      .vps-btn-active { background: #1e3a5f; border-color: #3b82f6; color: #bfdbfe; }
       #vps-status {
         font-size: 11.5px;
         min-height: 15px;
