@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Popularity Sorter (YouTube & Bilibili)
 // @namespace    http://tampermonkey.net/
-// @version      1.6
+// @version      2026.10.4
 // @description  Sort YouTube/Bilibili channel videos by popularity rating: Score = Views / √(Days + 7). Balances viral new content and enduring classic content.
 // @author       Jasonnor
 // @match        *://www.youtube.com/@*
@@ -288,6 +288,14 @@
       originalOrder = items.slice();
     }
 
+    if (!scoresVisible) {
+      scoresVisible = true;
+      const scoresBtn = document.getElementById('vps-btn-scores');
+      if (scoresBtn) {
+        scoresBtn.classList.add('vps-btn-active');
+        scoresBtn.textContent = '\uD83C\uDFF7 Hide Scores';
+      }
+    }
     const scored = items.map(item => {
       let score = parseFloat(item.dataset.vpsScore);
       if (!Number.isFinite(score) || score < 0) {
@@ -308,7 +316,7 @@
 
     isSorted = true;
     updateSortBtn();
-    if (scoresVisible) applyPercentileColors();
+    applyPercentileColors();
     showStatus(`Sorted ${items.length} videos by popularity rating.`, 'ok');
   }
 
@@ -626,7 +634,7 @@
         scoresBtn.textContent = '\uD83C\uDFF7 Show Scores on Cards'; // 🏷
       }
       syncBadgesVisibility();
-      if (scoresVisible) applyPercentileColors();
+      applyPercentileColors();
     });
     panel.appendChild(scoresBtn);
 
