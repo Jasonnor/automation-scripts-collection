@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili Video Filter & Sorter
 // @namespace    http://tampermonkey.net/
-// @version      1.0.0
+// @version      2026.10.4
 // @description  Filter and sort Bilibili videos by danmu count and view count
 // @author       Jasonnor
 // @match        https://space.bilibili.com/*
@@ -137,7 +137,7 @@
     /* Container */
     #bili-filter-helper {
       position: fixed;
-      top: 80px;
+      top: 140px;
       right: 16px;
       z-index: 999999;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
