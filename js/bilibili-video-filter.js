@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili Video Filter & Sorter
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.4
+// @version      2026.10.4.1
 // @description  Filter and sort Bilibili videos by danmu count and view count
 // @author       Jasonnor
 // @match        https://space.bilibili.com/*
@@ -147,14 +147,14 @@
     #bili-display {
       width: 56px;
       height: 56px;
-      background: linear-gradient(135deg, #00A1D6 0%, #00B5E5 100%);
+      background: linear-gradient(145deg, #00B5E5 0%, #0077A8 100%);
       color: #fff;
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      box-shadow: 0 4px 16px rgba(0, 161, 214, 0.4), 0 2px 8px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 18px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.35);
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       font-size: 26px;
       user-select: none;
@@ -195,9 +195,11 @@
       display: none;
       margin-top: 12px;
       padding: 16px;
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      background: rgba(24,24,27,0.96);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 16px;
+      box-shadow: 0 10px 36px rgba(0,0,0,0.45);
+      backdrop-filter: blur(14px);
       min-width: 320px;
       max-width: 380px;
     }
@@ -223,7 +225,7 @@
     .bili-title {
       font-size: 16px;
       font-weight: 600;
-      color: #212121;
+      color: #f4f4f5;
       margin-bottom: 16px;
       padding-bottom: 12px;
       border-bottom: 2px solid #00A1D6;
@@ -237,7 +239,7 @@
     .bili-section-title {
       font-size: 14px;
       font-weight: 600;
-      color: #505050;
+      color: #d4d4d8;
       margin-bottom: 10px;
     }
 
@@ -251,16 +253,18 @@
 
     .bili-control-group label {
       font-size: 13px;
-      color: #606060;
+      color: #a1a1aa;
       font-weight: 500;
     }
 
     .bili-control-group input {
       padding: 8px 12px;
       font-size: 14px;
-      border: 1.5px solid #e0e0e0;
-      border-radius: 6px;
+      border: 1.5px solid #3f3f46;
+      border-radius: 8px;
       outline: none;
+      background: #27272a;
+      color: #f4f4f5;
       transition: border-color 0.2s;
       font-family: inherit;
     }
@@ -282,13 +286,15 @@
     }
 
     .bili-btn-filter {
-      background: #00A1D6;
+      background: linear-gradient(180deg, #00B5E5, #0077A8);
       color: #fff;
       margin-top: 4px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.28);
     }
 
     .bili-btn-filter:hover {
-      background: #0086B3;
+      filter: brightness(1.08);
+      background: linear-gradient(180deg, #00B5E5, #0077A8);
       transform: translateY(-1px);
       box-shadow: 0 2px 8px rgba(0, 161, 214, 0.3);
     }
@@ -304,12 +310,13 @@
     }
 
     .bili-btn-sort {
-      background: #f0f0f0;
-      color: #505050;
+      background: #27272a;
+      color: #f4f4f5;
+      border: 1.5px solid #3f3f46;
     }
 
     .bili-btn-sort:hover {
-      background: #e0e0e0;
+      background: #3f3f46;
       transform: translateY(-1px);
     }
 
@@ -318,14 +325,16 @@
     }
 
     .bili-btn-reset {
-      background: #ff6b6b;
+      background: linear-gradient(180deg, #D23A3A, #8E1C1C);
       color: #fff;
       width: 100%;
       margin-top: 8px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.28);
     }
 
     .bili-btn-reset:hover {
-      background: #ee5a52;
+      filter: brightness(1.08);
+      background: linear-gradient(180deg, #D23A3A, #8E1C1C);
       transform: translateY(-1px);
       box-shadow: 0 2px 8px rgba(255, 107, 107, 0.3);
     }
@@ -335,7 +344,8 @@
     }
 
     .bili-btn:disabled {
-      background: #d0d0d0;
+      background: #3f3f46;
+      color: #a1a1aa;
       cursor: not-allowed;
       transform: none;
     }
@@ -345,8 +355,8 @@
       margin-top: 12px;
       padding: 8px 12px;
       font-size: 12px;
-      color: #606060;
-      background: #f5f5f5;
+      color: #e4e4e7;
+      background: #27272a;
       border-radius: 6px;
       text-align: center;
       min-height: 16px;
