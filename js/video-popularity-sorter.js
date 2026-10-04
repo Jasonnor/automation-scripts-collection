@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Video Popularity Sorter (YouTube & Bilibili)
 // @namespace    http://tampermonkey.net/
-// @version      2026.10.4
+// @version      2026.10.4.1
 // @description  Sort YouTube/Bilibili channel videos by popularity rating: Score = Views / √(Days + 7). Balances viral new content and enduring classic content.
 // @author       Jasonnor
 // @match        *://www.youtube.com/@*
@@ -44,30 +44,52 @@
   // ── YouTube Parsing ────────────────────────────────────────────────────────
   function parseYTViews(text) {
     if (!text) return 0;
-    // "95,627 views" | "95K views" | "1.3M views" | "No views"
-    text = text.replace(/,/g, '').replace(/\s*views?/i, '').trim();
+    text = text
+      .replace(/觀看次數[:：]?|观看次数[:：]?/g, "")
+      .replace(/,/g, "")
+      .replace(/\s*views?/ig, "")
+      .replace(/次/g, "")
+      .trim();
+    const zh = text.match(/([\d.]+)\s*([萬万億亿])/);
+    if (zh) {
+      let zhVal = parseFloat(zh[1]);
+      if (zh[2] === "萬" || zh[2] === "万") zhVal *= 1e4;
+      else zhVal *= 1e8;
+      return Math.round(zhVal);
+    }
     const m = text.match(/([\d.]+)\s*([KMBkmb])?/);
     if (!m) return 0;
     let val = parseFloat(m[1]);
-    const suf = (m[2] || '').toUpperCase();
-    if (suf === 'K') val *= 1e3;
-    else if (suf === 'M') val *= 1e6;
-    else if (suf === 'B') val *= 1e9;
+    const suf = (m[2] || "").toUpperCase();
+    if (suf === "K") val *= 1e3;
+    else if (suf === "M") val *= 1e6;
+    else if (suf === "B") val *= 1e9;
     return Math.round(val);
   }
 
   function parseYTDays(text) {
     if (!text) return 0;
-    // "5 days ago" | "2 weeks ago" | "3 months ago" | "1 year ago"
     const m = text.match(/(\d+)\s+(second|minute|hour|day|week|month|year)s?\s+ago/i);
-    if (!m) return 0;
-    const n = parseInt(m[1]);
-    const unit = m[2].toLowerCase();
-    if (unit === 'second' || unit === 'minute' || unit === 'hour') return 0;
-    if (unit === 'day') return n;
-    if (unit === 'week') return n * 7;
-    if (unit === 'month') return n * 30;
-    if (unit === 'year') return n * 365;
+    if (m) {
+      const n = parseInt(m[1]);
+      const unit = m[2].toLowerCase();
+      if (unit === "second" || unit === "minute" || unit === "hour") return 0;
+      if (unit === "day") return n;
+      if (unit === "week") return n * 7;
+      if (unit === "month") return n * 30;
+      if (unit === "year") return n * 365;
+    }
+    if (/昨天/.test(text)) return 1;
+    if (/今天|剛剛|刚刚/.test(text)) return 0;
+    let zh = text.match(/(\d+)\s*天前/);
+    if (zh) return parseInt(zh[1]);
+    zh = text.match(/(\d+)\s*[週周]前/);
+    if (zh) return parseInt(zh[1]) * 7;
+    zh = text.match(/(\d+)\s*個?月前/);
+    if (zh) return parseInt(zh[1]) * 30;
+    zh = text.match(/(\d+)\s*年前/);
+    if (zh) return parseInt(zh[1]) * 365;
+    if (/(\d+)\s*(小時|小时|分鐘|分钟|秒)前/.test(text)) return 0;
     return 0;
   }
 
@@ -134,29 +156,35 @@
       },
 
       getItems() {
-        // Filter out section header rows which are also ytd-rich-item-renderer
         return Array.from(document.querySelectorAll('ytd-rich-item-renderer')).filter(
-          el => el.querySelector('#video-title, #video-title-link, a#thumbnail')
+          el => el.querySelector(
+            '#video-title, #video-title-link, a#thumbnail, a.ytLockupViewModelContentImage, a.ytLockupMetadataViewModelTitle'
+          )
         );
       },
 
       getItemData(item) {
-        // First span = views ("95K views"), second span = time ("5 days ago")
         const spans = item.querySelectorAll(
-          '#metadata-line span.inline-metadata-item, #metadata-line span[class*="metadata-item"]'
+          '#metadata-line span.inline-metadata-item, #metadata-line span[class*="metadata-item"], .ytContentMetadataViewModelMetadataText'
         );
-        console.log('[VPS] getItemData: spans found=', spans.length,
-          spans[0]?.textContent?.trim(), '|', spans[1]?.textContent?.trim());
-        if (spans.length < 2) return null;
-        const views = parseYTViews(spans[0].textContent);
-        const days = parseYTDays(spans[1].textContent);
-        return {views, days};
+        const texts = Array.from(spans).map(
+          span => (span.getAttribute('aria-label') || span.textContent || '').trim()
+        ).filter(Boolean);
+        console.log('[VPS] getItemData:', texts.join(' | '));
+        if (texts.length === 0) return null;
+
+        const dateRe = /(\d+\s+(second|minute|hour|day|week|month|year)s?\s+ago|天前|[週周]前|月前|年前|昨天|今天|剛剛|刚刚)/i;
+        const viewRe = /(views?|觀看|观看|[萬万億亿]|[\d.]+\s*[KMBkmb])/i;
+        let viewText = texts.find(text => viewRe.test(text) && !dateRe.test(text));
+        let dateText = texts.find(text => dateRe.test(text));
+        if (viewText == null && texts.length >= 2) viewText = texts[0];
+        if (dateText == null && texts.length >= 2) dateText = texts[1];
+        if (viewText == null) return null;
+        return {views: parseYTViews(viewText), days: parseYTDays(dateText || '')};
       },
 
-      // Append the badge directly to the item (ytd-rich-item-renderer) to avoid Shadow DOM issues.
-      // The badge (position:absolute top:5px left:5px) will appear over the thumbnail area.
       getBadgeContainer(item) {
-        return null; // triggers item-level append in renderBadge
+        return item.querySelector('a.ytLockupViewModelContentImage');
       },
     },
 
