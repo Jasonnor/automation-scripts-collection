@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili Mark Watched
 // @namespace    BiliSearchViewed
-// @version      2026.10.7.2
+// @version      2026.10.7.4
 // @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone.
 // @author       Jasonnor, Truazusa
 // @match        https://search.bilibili.com/*
@@ -20,12 +20,8 @@
 // ==/UserScript==
 
 // 0 is invisible and 1 is opaque.
-// Watched cover.
-var opacityIsViewCover = 0.05;
 // Unwatched button.
 var opacitybtnView = 0.6;
-// Watched button.
-var opacitybtnIsView = 0.3;
 
 var GM_addStyle = GM_addStyle || function(css) {
   var style = document.createElement("style");
@@ -37,9 +33,9 @@ var GM_addStyle = GM_addStyle || function(css) {
 // Wh0, Ga10, and Ga5 follow html.bili_dark, so the same rules stay readable in both themes.
 let staticStyle = `
 .btnView{opacity:`+opacitybtnView+`;background:var(--Wh0,#fff);color:var(--Ga10,#18191c)!important;width:fit-content;line-height:16px;font-size:12px;text-align:center;cursor:pointer;display:inline-block;position:absolute;left:0;top:0;z-index:2;border:1px solid var(--Ga5,#9499a0);border-radius:3px;padding:3px 5px;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
-.btnIsView{opacity:`+opacitybtnIsView+`;background:var(--Wh0,#fff);}
 .btnView:hover{opacity:1;background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}
-.btnIsView:hover{background:var(--Ga10,#18191c);opacity:1;color:var(--Wh0,#fff)!important;}
+.btnIsView{--bili-viewed-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.8 5.1 4 7.3 8.2 2.8' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");opacity:1!important;top:6px;left:6px;width:16px!important;height:16px!important;padding:0!important;border:none!important;border-radius:50%!important;box-shadow:none!important;font-size:0!important;line-height:0!important;color:transparent!important;background-color:rgba(0,0,0,.55)!important;background-image:var(--bili-viewed-check)!important;background-repeat:no-repeat!important;background-position:center!important;background-size:10px 10px!important;}
+.btnIsView:hover{background-color:rgba(0,0,0,.8)!important;background-image:var(--bili-viewed-check)!important;color:transparent!important;}
 .btnSetAllViewed,.btnRefresh{display:inline-block;background:var(--Wh0,#fff);font-size:14px;border:1px solid var(--Ga5,#9499a0);border-radius:5px;color:var(--Ga10,#18191c)!important;padding:3px 5px;cursor:pointer;word-break:keep-all;}
 .btnSetAllViewed:hover,.btnRefresh:hover{background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}`;
 
@@ -1295,23 +1291,20 @@ var setBtnView = function(){
     var avId = $(this).data("av");
     var view = $(this).data("view");
     // Read the saved state before writing. The same id can show up on more than one card.
-    // Skip the play icon on course covers.
-    // Skip the disc image on the music ranking.
-    var coverObjs = $(this).parent().find(coverItemClass+":not(.block-list-item-info-player--img):not(.cover):first");
     var setIsViewed = false;
     if(view == 0){
       setIsViewed = true;
       $(this).text("已看");
+      $(this).attr("title","已看");
       $(this).removeClass("btnNotView");
       $(this).addClass("btnIsView");
       $(this).data("view","1");
-      coverObjs.css("opacity",opacityIsViewCover);
     }else{
       $(this).text("未看");
+      $(this).removeAttr("title");
       $(this).removeClass("btnIsView");
       $(this).addClass("btnNotView");
       $(this).data("view","0");
-      coverObjs.css("opacity","1");
     }
     $(".btnView").remove();
     saveGMVideoList(avId,setIsViewed);
@@ -1462,10 +1455,10 @@ var setSearchPage = function(){
 
 // Returns the id with the leading BV removed, or null when the card cannot be marked.
 // targetAppend: element that contains the link and receives the button.
-// coverClass: cover element whose opacity shows the watched state.
+// coverClass: cover element required on the card.
 // playType: 0 normal or bangumi, 1 old watch-later path, 2 bangumi id passed in, 3 watch-later list URL.
 // videoid: use this id instead of reading a link from targetAppend.
-// noAppendTarget: put the button on the cover and leave the cover opacity unchanged. Used on the player page.
+// noAppendTarget: put the button on the cover. Used on the player page.
 // isBefore: insert the button before the target instead of appending it inside.
 // findALast: use the last link in targetAppend.
 // findCoverClassLast: use the last cover match.
@@ -1501,12 +1494,10 @@ var setVideoIsViewed = function(targetAppend,coverClass,playType,videoid,noAppen
     var existingId = btnView.data("av");
     if(btnView.data("view") == 0 && (getBvIsViewed(existingId) || markProgressAsViewed(targetAppend, existingId))){
       btnView.text("已看");
+      btnView.attr("title","已看");
       btnView.data("view", 1);
       btnView.removeClass("btnNotView");
       btnView.addClass("btnIsView");
-      if(!noAppendTarget){
-        coverObj.css("opacity", opacityIsViewCover);
-      }
     }
     return null;
   }
@@ -1585,21 +1576,15 @@ var setVideoIsViewed = function(targetAppend,coverClass,playType,videoid,noAppen
   }
   if(getBvIsViewed(bvid)){
     if(isBefore){
-      targetAppend.before("<a class='btnView btnIsView' data-view='1' data-av='"+bvid+"'>已看</a>");
+      targetAppend.before("<a class='btnView btnIsView' title='已看' data-view='1' data-av='"+bvid+"'>已看</a>");
     }else{
-      targetAppend.append("<a class='btnView btnIsView' data-view='1' data-av='"+bvid+"'>已看</a>");
-    }
-    if(!noAppendTarget){
-      coverObj.css("opacity",opacityIsViewCover);
+      targetAppend.append("<a class='btnView btnIsView' title='已看' data-view='1' data-av='"+bvid+"'>已看</a>");
     }
   }else{
     if(isBefore){
       targetAppend.before("<a class='btnView btnNotView' data-view='0' data-av='"+bvid+"'>未看</a>");
     }else{
       targetAppend.append("<a class='btnView btnNotView' data-view='0' data-av='"+bvid+"'>未看</a>");
-    }
-    if(!noAppendTarget){
-      coverObj.css("opacity","1");
     }
   }
   return bvid;
