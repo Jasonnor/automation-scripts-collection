@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Bilibili Mark Watched
 // @namespace    BiliSearchViewed
-// @version      3.3.1
+// @version      2026.10.7.2
 // @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone.
 // @author       Jasonnor, Truazusa
 // @match        https://search.bilibili.com/*
@@ -9,7 +9,7 @@
 // @match        https://t.bilibili.com/*
 // @match        https://www.bilibili.com/*
 // @icon         https://www.google.com/s2/favicons?sz=64&domain=bilibili.com
-// @require      https://static.hdslb.com/js/jquery.min.js
+// @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js
 // @grant        unsafeWindow
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -21,9 +21,9 @@
 
 // 0 is invisible and 1 is opaque.
 // Watched cover.
-var opacityIsViewCover = 0.1;
+var opacityIsViewCover = 0.05;
 // Unwatched button.
-var opacitybtnView = 0.7;
+var opacitybtnView = 0.6;
 // Watched button.
 var opacitybtnIsView = 0.3;
 
@@ -34,13 +34,14 @@ var GM_addStyle = GM_addStyle || function(css) {
   document.getElementsByTagName("head")[0].appendChild(style);
 };
 
+// Wh0, Ga10, and Ga5 follow html.bili_dark, so the same rules stay readable in both themes.
 let staticStyle = `
-.btnView{opacity:`+opacitybtnView+`;background:#fff;color:#999!important;width:fit-content;line-height:16px;font-size:12px;text-align:center;cursor:pointer;display:inline-block;position:absolute;left:0;top:0;z-index:2;border:1px solid #999;border-radius:3px;padding:3px 5px;}
-.btnIsView{opacity:`+opacitybtnIsView+`;background:#fff8;}
-.btnView:hover{opacity:1;background:#aaa;color:#fff!important;}
-.btnIsView:hover{background:#fff;opacity:1;color:#999!important;}
-.btnSetAllViewed,.btnRefresh{display:inline-block;background:#fff;font-size:14px;border:1px solid #999;border-radius:5px;color:#999;padding:3px 5px;cursor:pointer;word-break:keep-all;}
-.btnSetAllViewed:hover,.btnRefresh:hover{background:#aaa;color:#fff;}`;
+.btnView{opacity:`+opacitybtnView+`;background:var(--Wh0,#fff);color:var(--Ga10,#18191c)!important;width:fit-content;line-height:16px;font-size:12px;text-align:center;cursor:pointer;display:inline-block;position:absolute;left:0;top:0;z-index:2;border:1px solid var(--Ga5,#9499a0);border-radius:3px;padding:3px 5px;box-shadow:0 0 0 1px rgba(0,0,0,.35);}
+.btnIsView{opacity:`+opacitybtnIsView+`;background:var(--Wh0,#fff);}
+.btnView:hover{opacity:1;background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}
+.btnIsView:hover{background:var(--Ga10,#18191c);opacity:1;color:var(--Wh0,#fff)!important;}
+.btnSetAllViewed,.btnRefresh{display:inline-block;background:var(--Wh0,#fff);font-size:14px;border:1px solid var(--Ga5,#9499a0);border-radius:5px;color:var(--Ga10,#18191c)!important;padding:3px 5px;cursor:pointer;word-break:keep-all;}
+.btnSetAllViewed:hover,.btnRefresh:hover{background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}`;
 
 var searchStyle = `
 /*Search results*/
@@ -459,7 +460,7 @@ const setAllViewedMethod = function(){
 // Course player
 var setCheesePlayPage = function(){
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     $(".layout-r").append("<a class='btnRefresh' title='如果列表没出现已看/未看标识，请手动点击这个按钮进行刷新'>刷新↗</a>");
     $(".btnRefresh").click(function(){
       setPageRefreshMethod();
@@ -649,7 +650,7 @@ var setBangumiPage = function(){
     break;
   }
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     if($(".toolbar").length > 0){
       $(".toolbar").append("<a class='btnRefresh' title='如果列表没出现已看/未看标识，请手动点击这个按钮进行刷新'>刷新→</a>");
     }else{
@@ -886,7 +887,7 @@ var setIndexPage = function(){
 
 var setVideoPage = function(){
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     // Place Refresh to the right of the note button's more menu.
     $(".video-toolbar-right").append(btnRefresh);
     btnRefresh.text("刷新↗");
@@ -901,7 +902,7 @@ var setVideoPage = function(){
   if(videos > 1){
     bvid = bvid + "-"+initState.p;
   }
-  if($(".video-info-meta").size() > 0){
+  if($(".video-info-meta").length > 0){
     setVideoIsViewed($(".video-info-meta"),".pubdate-ip",0,bvid,true);
     // Overflow popup, when the info bar has one.
     setVideoIsViewed($(".overflow-panel"),".pubdate-ip",0,bvid,true);
@@ -998,7 +999,7 @@ var setVideoPage = function(){
 
 var setFestivalVideoPage = function(){
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     // Place Refresh to the right of the note button's more menu.
     $(".video-toolbar-content_right").append("<a class='btnRefresh' title='如果列表没出现已看/未看标识，请手动点击这个按钮进行刷新'>刷新↗</a>");
     $(".btnRefresh").click(function(){
@@ -1049,7 +1050,7 @@ var setFestivalVideoPage = function(){
 
 var setHistoryPage = function(){
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     // History toolbar.
     $(".breadcrumbs__top .right").prepend(btnRefresh);
     $(".breadcrumbs__top .right").prepend(btnSetAllViewed);
@@ -1081,7 +1082,7 @@ var setHistoryPage = function(){
 // Watch later player
 var setListPlayPage = function(){
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     // Place Refresh to the right of the note button's more menu.
     $(".video-toolbar-right").append(btnRefresh);
     btnRefresh.text("刷新↗");
@@ -1148,7 +1149,7 @@ var setListPlayPage = function(){
 
 const setWatchlaterPage = function(){
   let refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     $(".list-header-options").prepend(btnRefresh);
     $(".list-header-options").prepend(btnSetAllViewed);
   }
@@ -1181,7 +1182,7 @@ const setWatchlaterPage = function(){
 
 const setSpacePage = function(){
   let refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     // Current space header.
     $(".nav-bar__main-left").append(btnRefresh);
     // Old space header.
@@ -1329,7 +1330,7 @@ var checkBtnViewLoad = function(){
     timer = null;
     return;
   }
-  btnCount = $(".btnView").size();
+  btnCount = $(".btnView").length;
   if(btnCount > 0 || checkCount > 5){
     clearInterval(timer);
     timer = null;
@@ -1345,7 +1346,7 @@ var videoArr = null;
 var isTextAreaHidden = true;
 var setSearchPage = function(){
   var refreshObj = $(".btnRefresh");
-  if(refreshObj.size() == 0){
+  if(refreshObj.length == 0){
     $(".vui_tabs--navbar").append("<a class='btnList' title='显示/隐藏已看ID的数据列表，建议定期复制到其他地方进行保存，避免因事故造成丢失'>显示/隐藏</a>");
     $(".vui_tabs--navbar").append("<a class='btnListSave' title='如果文本框内容有修改，请点击这个按钮进行保存。'>保存列表</a>");
     $(".vui_tabs--navbar").append("<textarea class='viewList'></textarea>");
@@ -1469,6 +1470,13 @@ var setSearchPage = function(){
 // findALast: use the last link in targetAppend.
 // findCoverClassLast: use the last cover match.
 var bvid = null;
+// A progress bar means Bilibili already recorded playback. One query per card, and a write only for a new id.
+var markProgressAsViewed = function(root, id){
+  if(!id || getBvIsViewed(id) || root.find(".bili-cover-card__progress").length === 0){
+    return false;
+  }
+  return saveGMVideoList(id, true);
+};
 var setVideoIsViewed = function(targetAppend,coverClass,playType,videoid,noAppendTarget,isBefore,findALast,findCoverClassLast){
   var coverObj = null;
   if(findCoverClassLast){
@@ -1490,6 +1498,16 @@ var setVideoIsViewed = function(targetAppend,coverClass,playType,videoid,noAppen
     btnView = targetAppend.children(".btnView:first");
   }
   if(btnView.length > 0){
+    var existingId = btnView.data("av");
+    if(btnView.data("view") == 0 && (getBvIsViewed(existingId) || markProgressAsViewed(targetAppend, existingId))){
+      btnView.text("已看");
+      btnView.data("view", 1);
+      btnView.removeClass("btnNotView");
+      btnView.addClass("btnIsView");
+      if(!noAppendTarget){
+        coverObj.css("opacity", opacityIsViewCover);
+      }
+    }
     return null;
   }
   if(videoid != null && playType != 2){
@@ -1561,6 +1579,7 @@ var setVideoIsViewed = function(targetAppend,coverClass,playType,videoid,noAppen
   }else{
     return null;
   }
+  markProgressAsViewed(targetAppend, bvid);
   if(noAppendTarget){
     targetAppend = coverObj;
   }
