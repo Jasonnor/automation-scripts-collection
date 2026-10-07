@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bilibili Mark Watched
 // @namespace    BiliSearchViewed
-// @version      2026.10.7.5
-// @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone. On a video page, the current part is marked watched after 80% of it has played.
+// @version      2026.10.8.2
+// @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone. On a video page, the current part is marked watched after 80% of it has played. On the dynamics feed, a button hides posts already marked watched and keeps loading until unwatched ones fill the screen.
 // @note         Forked from https://greasyfork.org/en/scripts/374894.
 // @author       Jasonnor, Truazusa
 // @match        https://search.bilibili.com/*
@@ -37,8 +37,8 @@ let staticStyle = `
 .btnView:hover{opacity:1;background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}
 .btnIsView{--bili-viewed-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.8 5.1 4 7.3 8.2 2.8' fill='none' stroke='%23fff' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");opacity:1!important;top:6px;left:6px;width:16px!important;height:16px!important;padding:0!important;border:none!important;border-radius:50%!important;box-shadow:none!important;font-size:0!important;line-height:0!important;color:transparent!important;background-color:rgba(0,0,0,.55)!important;background-image:var(--bili-viewed-check)!important;background-repeat:no-repeat!important;background-position:center!important;background-size:10px 10px!important;}
 .btnIsView:hover{background-color:rgba(0,0,0,.8)!important;background-image:var(--bili-viewed-check)!important;color:transparent!important;}
-.btnSetAllViewed,.btnRefresh{display:inline-block;background:var(--Wh0,#fff);font-size:14px;border:1px solid var(--Ga5,#9499a0);border-radius:5px;color:var(--Ga10,#18191c)!important;padding:3px 5px;cursor:pointer;word-break:keep-all;}
-.btnSetAllViewed:hover,.btnRefresh:hover{background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}`;
+.btnSetAllViewed,.btnRefresh,.btnUnwatchedOnly{display:inline-block;background:var(--Wh0,#fff);font-size:14px;border:1px solid var(--Ga5,#9499a0);border-radius:5px;color:var(--Ga10,#18191c)!important;padding:3px 5px;cursor:pointer;word-break:keep-all;}
+.btnSetAllViewed:hover,.btnRefresh:hover,.btnUnwatchedOnly:hover,.btnUnwatchedOnly.is-on{background:var(--Ga10,#18191c);color:var(--Wh0,#fff)!important;}`;
 
 var searchStyle = `
 /*Search results*/
@@ -79,6 +79,9 @@ const spaceStyle = `
 .channel-video .small-item:nth-child(4n+1) .btnView{left:0;}
 /*Dynamics*/
 .bili-dyn-content__orig__major{position:relative;}
+.bili-dyn-list-tabs{position:relative;}
+.bili-dyn-list-tabs .btnUnwatchedOnly{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:2;line-height:22px;}
+.bili-unwatched-only .bili-dyn-list__item:has(.btnIsView){display:none!important;}
 /*Uploads, list layout*/
 #submit-video-list .list-list .btnView{top:20px;left:0;}
 /*Collections, list layout*/
@@ -424,6 +427,9 @@ var curPageScrollTop = 0; // Current page scroll offset.
 var prePageScrollTop = 0; // Previous page scroll offset.
 var setPageScrollMethod = function(){
   $(window).scroll(function(){
+    if(dynFillKicking){
+      return;
+    }
     var curPageScrollTop = $(document).scrollTop();
     if(Math.abs(curPageScrollTop - prePageScrollTop) > pageHeight){
       prePageScrollTop = curPageScrollTop;
@@ -1371,6 +1377,197 @@ const setWatchlaterPage = function(){
   })
 }
 
+// Bilibili fetches the next dynamics page when a scroll event lands at the bottom.
+// Hiding watched posts shrinks the page, so the event is sent and the scroll position is put back in the same turn.
+var DYN_UNWATCHED_KEY = "BiliDynVideoUnwatchedOnly";
+var DYN_UNWATCHED_FILL_CAP = 10;
+var dynUnwatchedOnly = GM_getValue(DYN_UNWATCHED_KEY, false) === true;
+var dynFillLoads = 0;
+var dynFillSeen = -1;
+var dynFillRequested = false;
+var dynFillWaiting = false;
+var dynFillKicking = false;
+var dynFillTimer = null;
+var dynListObserver = null;
+var dynObservedList = null;
+var dynObserveTimer = null;
+
+var isDynFeed = function(){
+  return location.hostname === "t.bilibili.com";
+}
+
+var dynFeedEnded = function(){
+  var empty = $(".bili-dyn-list-empty");
+  return empty.length > 0 && empty.css("display") !== "none";
+}
+
+var dynFeedLoading = function(){
+  var loading = $(".bili-dyn-list-loading");
+  return loading.length > 0 && loading.css("display") !== "none";
+}
+
+var dynVisibleHeight = function(){
+  var height = 0;
+  $(".bili-dyn-list__item").each(function(){
+    if($(this).find(".btnIsView").length > 0){
+      return;
+    }
+    height += this.offsetHeight;
+  });
+  return height;
+}
+
+var clearDynFillTimer = function(){
+  if(dynFillTimer){
+    clearTimeout(dynFillTimer);
+    dynFillTimer = null;
+  }
+}
+
+var armDynFillRetry = function(){
+  if(dynFillTimer){
+    return;
+  }
+  dynFillTimer = setTimeout(function(){
+    dynFillTimer = null;
+    dynFillWaiting = false;
+    if(dynUnwatchedOnly && isDynFeed() && setMethod){
+      setMethod();
+    }
+  }, 1500);
+}
+
+var requestDynLoad = function(){
+  var scroller = document.scrollingElement || document.documentElement;
+  var previous = scroller.scrollTop;
+  dynFillKicking = true;
+  scroller.scrollTop = scroller.scrollHeight;
+  window.dispatchEvent(new Event("scroll"));
+  scroller.scrollTop = previous;
+  dynFillKicking = false;
+}
+
+var observeDynList = function(){
+  if(!isDynFeed()){
+    if(dynListObserver){
+      dynListObserver.disconnect();
+      dynListObserver = null;
+      dynObservedList = null;
+    }
+    return;
+  }
+  var items = document.querySelector(".bili-dyn-list__items");
+  if(!items || dynObservedList === items){
+    return;
+  }
+  if(dynListObserver){
+    dynListObserver.disconnect();
+  }
+  dynObservedList = items;
+  dynListObserver = new MutationObserver(function(){
+    if(!dynUnwatchedOnly || !isDynFeed()){
+      return;
+    }
+    clearTimeout(dynObserveTimer);
+    dynObserveTimer = setTimeout(function(){
+      if(setMethod){
+        setMethod();
+      }
+    }, 300);
+  });
+  dynListObserver.observe(items, {childList: true});
+}
+
+var syncDynVideoUnwatched = function(){
+  var tabs = $(".bili-dyn-list-tabs").first();
+  var btn = $(".btnUnwatchedOnly");
+  if(!isDynFeed() || tabs.length === 0){
+    btn.remove();
+    $(".bili-dyn-list").removeClass("bili-unwatched-only");
+    clearDynFillTimer();
+    observeDynList();
+    return;
+  }
+  if(btn.length === 0){
+    btn = $("<a class='btnUnwatchedOnly' title='隐藏已看的动态，并继续加载，直到画面里有未看的。最多自动加载十次。'>只看未看</a>");
+    btn.on("click", function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      dynUnwatchedOnly = !dynUnwatchedOnly;
+      dynFillLoads = 0;
+      dynFillRequested = false;
+      dynFillWaiting = false;
+      dynFillSeen = -1;
+      clearDynFillTimer();
+      GM_setValue(DYN_UNWATCHED_KEY, dynUnwatchedOnly);
+      if(setMethod){
+        setMethod();
+      }
+      return false;
+    });
+    tabs.append(btn);
+  }
+  btn.toggleClass("is-on", dynUnwatchedOnly);
+  if(dynUnwatchedOnly){
+    btn.text("显示全部");
+    btn.attr("title", "当前只显示未看，点击恢复全部动态。");
+  }else{
+    btn.text("只看未看");
+    btn.attr("title", "隐藏已看的动态，并继续加载，直到画面里有未看的。最多自动加载十次。");
+  }
+  observeDynList();
+  if(!dynUnwatchedOnly){
+    $(".bili-dyn-list").removeClass("bili-unwatched-only");
+    clearDynFillTimer();
+    dynFillLoads = 0;
+    dynFillRequested = false;
+    dynFillWaiting = false;
+    return;
+  }
+  $(".bili-dyn-list").first().addClass("bili-unwatched-only");
+  var count = $(".bili-dyn-list__item").length;
+  if(count !== dynFillSeen){
+    var fromUs = dynFillRequested;
+    dynFillRequested = false;
+    dynFillWaiting = false;
+    if(dynFillSeen >= 0 && count > dynFillSeen && !fromUs){
+      dynFillLoads = 0;
+    }
+    dynFillSeen = count;
+  }
+  if(dynVisibleHeight() >= window.innerHeight){
+    dynFillLoads = 0;
+    dynFillWaiting = false;
+    clearDynFillTimer();
+    return;
+  }
+  if(dynFeedEnded()){
+    clearDynFillTimer();
+    return;
+  }
+  if(count === 0){
+    if(dynFillLoads < DYN_UNWATCHED_FILL_CAP){
+      dynFillLoads++;
+      armDynFillRetry();
+    }
+    return;
+  }
+  if(dynFeedLoading() || dynFillWaiting){
+    if(dynFillLoads < DYN_UNWATCHED_FILL_CAP){
+      armDynFillRetry();
+    }
+    return;
+  }
+  if(dynFillLoads >= DYN_UNWATCHED_FILL_CAP){
+    return;
+  }
+  dynFillLoads++;
+  dynFillRequested = true;
+  dynFillWaiting = true;
+  requestDynLoad();
+  armDynFillRetry();
+}
+
 const setSpacePage = function(){
   let refreshObj = $(".btnRefresh");
   if(refreshObj.length == 0){
@@ -1415,6 +1612,10 @@ const setSpacePage = function(){
     setVideoIsViewed($(this),coverItemClass);
   });
   setBtnView();
+  syncDynVideoUnwatched();
+  $(".bili-dyn-list-tabs__item").unbind("click").click(function(){
+    setTimeout(setPageRefreshMethod,500);
+  })
   $(".bili-dyn-up-list__item").unbind("click").click(function(){
     prePageScrollTop = 0;
     setTimeout(setPageRefreshMethod,2000);
