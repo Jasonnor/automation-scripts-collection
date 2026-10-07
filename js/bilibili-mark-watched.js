@@ -1,8 +1,9 @@
 // ==UserScript==
 // @name         Bilibili Mark Watched
 // @namespace    BiliSearchViewed
-// @version      2026.10.7.4
-// @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone.
+// @version      2026.10.7.5
+// @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone. On a video page, the current part is marked watched after 80% of it has played.
+// @note         Forked from https://greasyfork.org/en/scripts/374894.
 // @author       Jasonnor, Truazusa
 // @match        https://search.bilibili.com/*
 // @match        https://space.bilibili.com/*
@@ -881,6 +882,203 @@ var setIndexPage = function(){
   setBtnView();
 }
 
+// 80% of media time in video.played marks the part. Seeks are not in those ranges.
+// A replaced element starts with empty ranges, so the previous total is kept.
+// ended counts only within a second of the end, including after a seek there.
+var playbackWatchedRatio = 0.8;
+var playbackEndSlack = 1;
+var playbackWatchId = null;
+var playbackElement = null;
+var playbackWatched = 0;
+var playbackLastPlayed = 0;
+var playbackDuration = 0;
+var autoMarkSuppressedId = null;
+var playbackWatchTimer = null;
+
+var pageVideoId = function(initState){
+  var id = initState.bvid;
+  if(initState.videoData.videos > 1){
+    id = id + "-" + initState.p;
+  }
+  return id;
+};
+
+var storageVideoId = function(id){
+  if(!id){
+    return null;
+  }
+  if(id.startsWith("BV") || id.startsWith("bv")){
+    return id.substr(2);
+  }
+  return id;
+};
+
+var playedSeconds = function(video){
+  var ranges = video.played;
+  if(!ranges){
+    return 0;
+  }
+  var total = 0;
+  for(var i = 0; i < ranges.length; i++){
+    var span = ranges.end(i) - ranges.start(i);
+    if(span > 0){
+      total += span;
+    }
+  }
+  return total;
+};
+
+var applyPlayedSample = function(watched, lastPlayed, playedNow, isNewElement){
+  if(isNewElement){
+    return {watched: watched + playedNow, lastPlayed: playedNow, reset: false};
+  }
+  var delta = playedNow - lastPlayed;
+  if(delta < 0){
+    return {watched: watched + playedNow, lastPlayed: playedNow, reset: true};
+  }
+  if(delta > 0){
+    return {watched: watched + delta, lastPlayed: playedNow, reset: false};
+  }
+  return {watched: watched, lastPlayed: lastPlayed, reset: false};
+};
+
+var playbackShouldMark = function(watched, duration){
+  return Number.isFinite(duration) && duration > 0 && watched / duration >= playbackWatchedRatio;
+};
+
+var playbackReachedEnd = function(current, duration){
+  return Number.isFinite(duration) && duration > 0 && Number.isFinite(current) && duration - current <= playbackEndSlack;
+};
+
+var markPlaybackWatched = function(id){
+  if(!id || autoMarkSuppressedId === String(id) || getBvIsViewed(id)){
+    return;
+  }
+  if(!saveGMVideoList(id, true)){
+    return;
+  }
+  $(".btnView").each(function(){
+    var btn = $(this);
+    if(String(btn.data("av")) !== String(id) || btn.data("view") == 1){
+      return;
+    }
+    btn.text("已看");
+    btn.attr("title","已看");
+    btn.data("view", 1);
+    btn.removeClass("btnNotView");
+    btn.addClass("btnIsView");
+  });
+};
+
+var tryMarkPlayback = function(id){
+  if(playbackShouldMark(playbackWatched, playbackDuration)){
+    markPlaybackWatched(id);
+  }
+};
+
+var onPlaybackTime = function(e){
+  if(playbackElement && e.target !== playbackElement){
+    return;
+  }
+  watchPlayback();
+};
+
+var onPlaybackEnded = function(e){
+  var video = e.target;
+  if(!playbackReachedEnd(video.currentTime, video.duration)){
+    return;
+  }
+  markPlaybackWatched(video.__biliMarkPlayedId);
+};
+
+var bindPlaybackEvents = function(video){
+  if(video.__biliMarkPlayed){
+    return;
+  }
+  video.__biliMarkPlayed = true;
+  video.__biliMarkPlayedId = playbackWatchId;
+  video.addEventListener("timeupdate", onPlaybackTime);
+  video.addEventListener("ended", onPlaybackEnded);
+};
+
+var ensurePlaybackTimer = function(){
+  if(playbackWatchTimer != null){
+    return;
+  }
+  playbackWatchTimer = setInterval(watchPlayback, 1000);
+};
+
+var rememberDuration = function(video){
+  if(video && Number.isFinite(video.duration) && video.duration > 0){
+    playbackDuration = video.duration;
+  }
+};
+
+var watchPlayback = function(){
+  var initState = unsafeWindow.__INITIAL_STATE__;
+  if(!initState || !initState.bvid || !initState.videoData){
+    return;
+  }
+  var id = storageVideoId(pageVideoId(initState));
+  if(!id){
+    return;
+  }
+  var video = document.querySelector(".bpx-player-video-wrap video");
+  if(id !== playbackWatchId){
+    if(playbackWatchId){
+      if(playbackElement){
+        var leaving = applyPlayedSample(playbackWatched, playbackLastPlayed, playedSeconds(playbackElement), false);
+        if(!leaving.reset){
+          playbackWatched = leaving.watched;
+          playbackLastPlayed = leaving.lastPlayed;
+        }
+      }
+      tryMarkPlayback(playbackWatchId);
+      autoMarkSuppressedId = null;
+    }
+    var switched = playbackWatchId != null;
+    var leavingElement = playbackElement;
+    playbackWatchId = id;
+    playbackWatched = 0;
+    playbackDuration = 0;
+    if(switched && video && leavingElement === video){
+      // Ranges already counted belong to the previous part until this element reloads.
+      playbackLastPlayed = playedSeconds(video);
+      rememberDuration(video);
+      ensurePlaybackTimer();
+      return;
+    }
+    if(switched){
+      playbackElement = null;
+      playbackLastPlayed = 0;
+    }
+  }
+  if(!video){
+    ensurePlaybackTimer();
+    return;
+  }
+  if(playbackElement && playbackElement !== video){
+    var frozen = applyPlayedSample(playbackWatched, playbackLastPlayed, playedSeconds(playbackElement), false);
+    playbackWatched = frozen.watched;
+    playbackLastPlayed = frozen.lastPlayed;
+  }
+  var playedNow = playedSeconds(video);
+  var isNewElement = playbackElement !== video;
+  var sample = applyPlayedSample(playbackWatched, playbackLastPlayed, playedNow, isNewElement);
+  playbackWatched = sample.watched;
+  playbackLastPlayed = sample.lastPlayed;
+  if(sample.reset){
+    video.__biliMarkPlayedId = playbackWatchId;
+  }
+  if(isNewElement){
+    bindPlaybackEvents(video);
+    playbackElement = video;
+  }
+  rememberDuration(video);
+  tryMarkPlayback(id);
+  ensurePlaybackTimer();
+};
+
 var setVideoPage = function(){
   var refreshObj = $(".btnRefresh");
   if(refreshObj.length == 0){
@@ -893,11 +1091,8 @@ var setVideoPage = function(){
     return;
   }
   // A multi-part video is stored as bvid-part.
-  var bvid = initState.bvid;
-  var videos = initState.videoData.videos; // Part count.
-  if(videos > 1){
-    bvid = bvid + "-"+initState.p;
-  }
+  var bvid = pageVideoId(initState);
+  watchPlayback();
   if($(".video-info-meta").length > 0){
     setVideoIsViewed($(".video-info-meta"),".pubdate-ip",0,bvid,true);
     // Overflow popup, when the info bar has one.
@@ -1305,6 +1500,13 @@ var setBtnView = function(){
       $(this).removeClass("btnIsView");
       $(this).addClass("btnNotView");
       $(this).data("view","0");
+      // Leave the playing part unmarked until the video changes.
+      if(String(avId) === String(playbackWatchId)){
+        autoMarkSuppressedId = String(avId);
+      }
+    }
+    if(setIsViewed && autoMarkSuppressedId === String(avId)){
+      autoMarkSuppressedId = null;
     }
     $(".btnView").remove();
     saveGMVideoList(avId,setIsViewed);
