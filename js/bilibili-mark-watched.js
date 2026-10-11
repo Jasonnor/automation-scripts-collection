@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Bilibili Mark Watched
 // @namespace    BiliSearchViewed
-// @version      2026.10.8.2
-// @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone. On a video page, the current part is marked watched after 80% of it has played. On the dynamics feed, a button hides posts already marked watched and keeps loading until unwatched ones fill the screen.
+// @version      2026.10.12.1
+// @description  Manually mark watched videos on Bilibili so watched and unwatched ones are easy to tell apart. Covers home, video, history, watch later, user space, and search. Other pages are left alone. On a video page, the current part is marked watched after 80% of it has played. On the dynamics feed, a video post scrolled past is marked read, and a button hides watched and read posts and keeps loading until unread ones fill the screen.
 // @note         Forked from https://greasyfork.org/en/scripts/374894.
 // @author       Jasonnor, Truazusa
 // @match        https://search.bilibili.com/*
@@ -81,7 +81,8 @@ const spaceStyle = `
 .bili-dyn-content__orig__major{position:relative;}
 .bili-dyn-list-tabs{position:relative;}
 .bili-dyn-list-tabs .btnUnwatchedOnly{position:absolute;right:0;top:50%;transform:translateY(-50%);z-index:2;line-height:22px;}
-.bili-unwatched-only .bili-dyn-list__item:has(.btnIsView){display:none!important;}
+.bili-unwatched-only .bili-dyn-list__item:has(.btnIsView),.bili-unwatched-only .bili-dyn-read:not(.bili-dyn-read-new){display:none!important;}
+.bili-dyn-read .bili-dyn-time::after{content:" · 已读";}
 /*Uploads, list layout*/
 #submit-video-list .list-list .btnView{top:20px;left:0;}
 /*Collections, list layout*/
@@ -282,10 +283,15 @@ $(document).ready(function(){
     GM_addStyle(spaceStyle);
     setMethod = setSpacePage;
     setPageScrollMethod();
+    if(isDynFeed()){
+      $(window).scroll(scheduleDynReadMark);
+      GM_registerMenuCommand("清除动态已读记录", clearDynRead);
+    }
     if($(".bili-dyn-up-list__item").length == 0){
       // Avatars are not in the DOM yet. Bind again after 2 seconds.
       setTimeout(function(){
         $(".bili-dyn-up-list__item").unbind("click").click(function(){
+          dynReadThisPage.clear();
           prePageScrollTop = 0;
           setTimeout(setPageRefreshMethod,2000);
         })
@@ -1406,15 +1412,67 @@ var dynFeedLoading = function(){
   return loading.length > 0 && loading.css("display") !== "none";
 }
 
+// Hidden items have an offsetHeight of 0.
 var dynVisibleHeight = function(){
   var height = 0;
   $(".bili-dyn-list__item").each(function(){
-    if($(this).find(".btnIsView").length > 0){
-      return;
-    }
     height += this.offsetHeight;
   });
   return height;
+}
+
+// A video post counts as read once its bottom edge scrolls above the viewport.
+// Posts read on this page stay expanded until the next load or tab switch, so the content does not jump while scrolling.
+var dynReadThisPage = new Set();
+var dynReadScheduled = false;
+
+var getDynVideoId = function(item){
+  var href = $(item).find("a.bili-dyn-card-video").first().attr("href") || "";
+  var match = href.match(/\/video\/(?:BV|bv)([0-9A-Za-z]{10})/);
+  return match ? match[1] : null;
+}
+
+var tagDynRead = function(){
+  $(".bili-dyn-list__item").each(function(){
+    var id = getDynVideoId(this);
+    var read = id !== null && getBvIsRead(id);
+    this.classList.toggle("bili-dyn-read", read);
+    this.classList.toggle("bili-dyn-read-new", read && dynReadThisPage.has(id));
+  });
+}
+
+var markDynReadPast = function(){
+  dynReadScheduled = false;
+  $(".bili-dyn-list__item").each(function(){
+    if(this.classList.contains("bili-dyn-read") || this.offsetHeight === 0 || this.getBoundingClientRect().bottom > 0){
+      return;
+    }
+    var id = getDynVideoId(this);
+    if(!id || !saveGMReadList(id)){
+      return;
+    }
+    dynReadThisPage.add(id);
+    this.classList.add("bili-dyn-read", "bili-dyn-read-new");
+  });
+}
+
+var scheduleDynReadMark = function(){
+  if(dynFillKicking || dynReadScheduled){
+    return;
+  }
+  dynReadScheduled = true;
+  requestAnimationFrame(markDynReadPast);
+}
+
+var clearDynRead = function(){
+  if(!confirm("清除所有动态的已读记录？")){
+    return;
+  }
+  clearAllBiliReadData();
+  dynReadThisPage.clear();
+  if(setMethod){
+    setMethod();
+  }
 }
 
 var clearDynFillTimer = function(){
@@ -1481,6 +1539,9 @@ var observeDynList = function(){
 var syncDynVideoUnwatched = function(){
   var tabs = $(".bili-dyn-list-tabs").first();
   var btn = $(".btnUnwatchedOnly");
+  if(isDynFeed()){
+    tagDynRead();
+  }
   if(!isDynFeed() || tabs.length === 0){
     btn.remove();
     $(".bili-dyn-list").removeClass("bili-unwatched-only");
@@ -1489,7 +1550,7 @@ var syncDynVideoUnwatched = function(){
     return;
   }
   if(btn.length === 0){
-    btn = $("<a class='btnUnwatchedOnly' title='隐藏已看的动态，并继续加载，直到画面里有未看的。最多自动加载十次。'>只看未看</a>");
+    btn = $("<a class='btnUnwatchedOnly'></a>");
     btn.on("click", function(e){
       e.preventDefault();
       e.stopPropagation();
@@ -1510,10 +1571,10 @@ var syncDynVideoUnwatched = function(){
   btn.toggleClass("is-on", dynUnwatchedOnly);
   if(dynUnwatchedOnly){
     btn.text("显示全部");
-    btn.attr("title", "当前只显示未看，点击恢复全部动态。");
+    btn.attr("title", "当前隐藏已看和已读的动态，点击恢复全部动态。");
   }else{
-    btn.text("只看未看");
-    btn.attr("title", "隐藏已看的动态，并继续加载，直到画面里有未看的。最多自动加载十次。");
+    btn.text("只看未读");
+    btn.attr("title", "隐藏已看和已读的动态，并继续加载，直到画面里有未读的。最多自动加载十次。滑过的视频动态会标为已读。");
   }
   observeDynList();
   if(!dynUnwatchedOnly){
@@ -1614,9 +1675,11 @@ const setSpacePage = function(){
   setBtnView();
   syncDynVideoUnwatched();
   $(".bili-dyn-list-tabs__item").unbind("click").click(function(){
+    dynReadThisPage.clear();
     setTimeout(setPageRefreshMethod,500);
   })
   $(".bili-dyn-up-list__item").unbind("click").click(function(){
+    dynReadThisPage.clear();
     prePageScrollTop = 0;
     setTimeout(setPageRefreshMethod,2000);
   })
@@ -2112,6 +2175,41 @@ var updateViewVideoMap = function(groupMap) {
   for (var key in groupMap) {
     viewVideoMap[key] = new Set(groupMap[key]);
   }
+};
+
+// Read status uses the same grouping under its own prefix, so the watched list export and clear leave it alone.
+var readVideoMap = {};
+var getBvIsRead = function(bvid){
+  const groupId = getGroupId(bvid);
+  if (!groupId) {
+    return false;
+  }
+  if (!readVideoMap[groupId]) {
+    readVideoMap[groupId] = new Set(GM_getValue("BiliRead_" + groupId, []));
+  }
+  return readVideoMap[groupId].has(bvid);
+}
+
+// Reload the group before writing so another open feed tab's marks are not overwritten.
+var saveGMReadList = function(bvid){
+  const groupId = getGroupId(bvid);
+  if (!groupId) {
+    return false;
+  }
+  const readSet = new Set(GM_getValue("BiliRead_" + groupId, []));
+  readSet.add(bvid);
+  GM_setValue("BiliRead_" + groupId, Array.from(readSet));
+  readVideoMap[groupId] = readSet;
+  return true;
+}
+
+var clearAllBiliReadData = function() {
+  for (var key of GM_listValues()) {
+    if (key.indexOf("BiliRead_") === 0) {
+      GM_deleteValue(key);
+    }
+  }
+  readVideoMap = {};
 };
 
 // AV to BV. https://github.com/Coxxs/bvid/blob/master/bvid.js
